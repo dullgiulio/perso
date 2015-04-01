@@ -1,18 +1,18 @@
 package main
 
 import (
-	"fmt"
 	"flag"
+	"fmt"
+	"log"
+	"net/mail"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
-	"net/mail"
-	"log"
 )
 
 type mailFile struct {
-	ID mailID
+	ID  mailID
 	msg *mail.Message
 }
 
@@ -35,12 +35,12 @@ func (m *mailFile) load() error {
 
 type fileEntry struct {
 	found bool
-	info os.FileInfo
+	info  os.FileInfo
 }
 
 type files struct {
-	f map[mailID]fileEntry
-	l *sync.Mutex
+	f      map[mailID]fileEntry
+	l      *sync.Mutex
 	caches *caches
 }
 
@@ -52,8 +52,8 @@ func newFiles() *files {
 	go caches.run()
 
 	return &files{
-		f: make(map[mailID]fileEntry),
-		l: &sync.Mutex{},
+		f:      make(map[mailID]fileEntry),
+		l:      &sync.Mutex{},
 		caches: caches,
 	}
 }
@@ -61,14 +61,13 @@ func newFiles() *files {
 func (f *files) _update(file mailID, info os.FileInfo) {
 	// TODO: Remove this entry from the indices
 
-	f.f[file] = fileEntry{ found: true, info: info }
-	fmt.Printf("+ %s\n", file)
+	f.f[file] = fileEntry{found: true, info: info}
 
 	// TODO: Index again this entry
 }
 
 func (f *files) _add(file mailID, info os.FileInfo) {
-	f.f[file] = fileEntry{ found: true, info: info }
+	f.f[file] = fileEntry{found: true, info: info}
 
 	m := newMailFile(file)
 	if err := m.load(); err != nil {
@@ -80,7 +79,7 @@ func (f *files) _add(file mailID, info os.FileInfo) {
 }
 
 func (f *files) _unchanged(file mailID, info os.FileInfo) {
-	f.f[file] = fileEntry{ found: true, info: info }
+	f.f[file] = fileEntry{found: true, info: info}
 }
 
 func (f *files) addOrUpdate(file mailID, finfo os.FileInfo) {
@@ -89,7 +88,7 @@ func (f *files) addOrUpdate(file mailID, finfo os.FileInfo) {
 
 	if entry, ok := f.f[file]; ok {
 		if entry.info.Size() != finfo.Size() ||
-		   entry.info.ModTime() != finfo.ModTime() {
+			entry.info.ModTime() != finfo.ModTime() {
 			f._update(file, finfo)
 		} else {
 			f._unchanged(file, finfo)
@@ -153,17 +152,19 @@ func (m *mailDir) update() {
 	})
 }
 
-func (m *mailDir) updateLoop() {
+func (m *mailDir) updateLoop(tick chan<- struct{}) {
 	for {
 		// TODO: Errors on error channel.
 		m.update()
+
+		tick <- struct{}{}
 
 		<-time.After(m.walkInterval)
 	}
 }
 
-func (m *mailDir) run() {
-	go m.updateLoop()
+func (m *mailDir) run(tick chan<- struct{}) {
+	go m.updateLoop(tick)
 
 	for {
 		select {
@@ -178,9 +179,23 @@ func main() {
 	flag.Parse()
 	root := flag.Arg(0)
 
-	md := newMailDir(root, time.Second)
-	go md.run()
+	indexing := make(chan struct{})
 
-	<-time.After(3 * time.Second)
+	md := newMailDir(root, time.Second)
+	go md.run(indexing)
+
+	<-indexing
+
+	caches := md.files.caches
+	cacheReq := cacheRequest{
+		name: "to",
+		str:  "dullgiulio@gmail.com",
+		data: make(chan []mailID),
+	}
+	caches.requestCh <- cacheReq
+	data := <-cacheReq.data
+
+	fmt.Printf("%v\n", data)
+
 	md.cancel()
 }

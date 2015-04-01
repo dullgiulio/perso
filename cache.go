@@ -1,53 +1,53 @@
 package main
 
 import (
-	"fmt"
-	"time"
+	"log"
+	"net/mail"
 	"sort"
 	"strings"
-	"net/mail"
+	"time"
 )
 
 type cacheString map[string][]mailID
 type cacheTime map[time.Time][]mailID
 
 type caches struct {
-	str map[string]cacheString
-	time map[string]cacheTime
-	cancelCh chan struct{}
-	mailCh chan cacheMail
+	str       map[string]cacheString
+	time      map[string]cacheTime
+	cancelCh  chan struct{}
+	mailCh    chan cacheMail
 	requestCh chan cacheRequest
-	sweepCh chan []mailID
+	sweepCh   chan []mailID
 }
 
 type cacheRequest struct {
-	name string
-	time time.Time
-	str  string
+	name     string
+	time     time.Time
+	str      string
 	submatch bool
-	lower bool
-	data chan<- []string
+	lower    bool
+	data     chan []mailID
 }
 
 type cacheMail struct {
-	id mailID
+	id      mailID
 	headers mail.Header
 }
 
 func newCacheRequest() *cacheRequest {
 	return &cacheRequest{
-		data: make(chan []string),
+		data: make(chan []mailID),
 	}
 }
 
 func makeCaches() *caches {
-    return &caches{
-        str: make(map[string]cacheString),
-        time: make(map[string]cacheTime),
-	    cancelCh: make(chan struct{}),
-		mailCh: make(chan cacheMail),
+	return &caches{
+		str:       make(map[string]cacheString),
+		time:      make(map[string]cacheTime),
+		cancelCh:  make(chan struct{}),
+		mailCh:    make(chan cacheMail),
 		requestCh: make(chan cacheRequest),
-		sweepCh: make(chan []mailID),
+		sweepCh:   make(chan []mailID),
 	}
 }
 
@@ -59,46 +59,72 @@ func (c *caches) initCachesTime(name string) {
 	c.time[name] = make(map[time.Time][]mailID)
 }
 
-func (m *cacheMail) getHeader(h string) []string {
+func (m *cacheMail) getHeader(h string) (string, []string) {
 	for header, v := range m.headers {
-		header = strings.ToLower(header)
-		if header == h {
-			return v
+		hl := strings.ToLower(header)
+		if hl == h {
+			return header, v
 		}
 	}
 
-	return nil
+	return "", nil
 }
 
 func (c *caches) indexMail(m cacheMail) {
 	for name := range c.str {
-		// TODO: Special case for 'to' and 'from': parse addresses
-		if val := m.getHeader(name); val != nil {
+		headerKey, val := m.getHeader(name)
+		if val == nil {
+			continue
+		}
+
+		switch name {
+		case "to", "from":
+			if addresses, err := m.headers.AddressList(headerKey); err == nil {
+				for _, a := range addresses {
+					c.addString(name, strings.ToLower(a.Address), m.id)
+				}
+			} else {
+				log.Print(err)
+			}
+		default:
 			for _, v := range val {
 				c.addString(name, v, m.id)
 			}
 		}
 	}
+
+	for name := range c.time {
+		// XXX: Only support the "date" header for now.
+		if name != "date" {
+			continue
+		}
+
+		if date, err := m.headers.Date(); err == nil {
+			c.addTime(name, date, m.id)
+		} else {
+			log.Print(err)
+		}
+	}
 }
 
 func (c *caches) addString(name string, key string, value mailID) {
-    if _, found := c.str[name][key]; !found {
-        c.str[name][key] = make([]mailID, 0)
-    }
+	if _, found := c.str[name][key]; !found {
+		c.str[name][key] = make([]mailID, 0)
+	}
 
-    c.str[name][key] = append(c.str[name][key], value)
+	c.str[name][key] = append(c.str[name][key], value)
 }
 
 func (c *caches) getString(name string, key string) []mailID {
-    return c.str[name][key]
+	return c.str[name][key]
 }
 
 func (c *caches) addTime(name string, key time.Time, value mailID) {
 	if _, found := c.time[name][key]; !found {
-        c.time[name][key] = make([]mailID, 0)
-    }
+		c.time[name][key] = make([]mailID, 0)
+	}
 
-    c.time[name][key] = append(c.time[name][key], value)
+	c.time[name][key] = append(c.time[name][key], value)
 }
 
 func (c *caches) getKeysString(name string) []string {
@@ -179,7 +205,7 @@ func (c *caches) request(r cacheRequest) {
 }
 
 func (c *caches) index(id mailID, headers mail.Header) {
-	c.mailCh <- cacheMail{ id: id, headers: headers }
+	c.mailCh <- cacheMail{id: id, headers: headers}
 }
 
 func (c *caches) run() {
@@ -189,10 +215,20 @@ func (c *caches) run() {
 			return
 		case m := <-c.mailCh:
 			// Index this mail
-			fmt.Printf("Indexing %s\n", m.id)
 			c.indexMail(m)
-		case <-c.requestCh:
+		case r := <-c.requestCh:
 			// Send back []mailID
+			if r.str != "" {
+				if cache, found := c.str[r.name]; found {
+					ids := cache[r.str]
+					result := make([]mailID, len(ids))
+					copy(result, ids)
+					r.data <- result
+					continue
+				}
+			}
+
+			r.data <- nil
 		case mailIDs := <-c.sweepCh:
 			c.sweep(mailIDs)
 		}
