@@ -7,46 +7,90 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"net/mail"
+	"log"
 )
 
-type fileStatus int
+type mailFile struct {
+	ID mailID
+	msg *mail.Message
+}
 
-const (
-	fileStatusNone fileStatus = iota
-	fileStatusRem
-	fileStatusAdd
-)
+func newMailFile(id mailID) *mailFile {
+	return &mailFile{
+		ID: id,
+	}
+}
+
+func (m *mailFile) load() error {
+	mailfile := string(m.ID)
+	reader, err := os.Open(mailfile)
+	if err != nil {
+		return err
+	}
+
+	m.msg, err = mail.ReadMessage(reader)
+	return err
+}
+
+type fileEntry struct {
+	found bool
+	info os.FileInfo
+}
 
 type files struct {
-	f map[string]fileStatus
+	f map[mailID]fileEntry
 	l *sync.Mutex
 }
 
 func newFiles() *files {
 	return &files{
-		f: make(map[string]fileStatus),
+		f: make(map[mailID]fileEntry),
 		l: &sync.Mutex{},
 	}
 }
 
-func (f *files) _add(file string) {
-	f.f[file] = fileStatusAdd
+func (f *files) _update(file mailID, info os.FileInfo) {
+	// TODO: Remove this entry from the indices
+
+	f.f[file] = fileEntry{ found: true, info: info }
 	fmt.Printf("+ %s\n", file)
+
+	// TODO: Index again this entry
 }
 
-func (f *files) _unchanged(file string) {
-	f.f[file] = fileStatusNone
+func (f *files) _add(file mailID, info os.FileInfo) {
+	f.f[file] = fileEntry{ found: true, info: info }
+
+	m := newMailFile(file)
+	if err := m.load(); err != nil {
+		log.Print(err)
+	}
+
+	for k, v := range m.msg.Header {
+		fmt.Printf("Header: %s -> %s\n", k, v)
+	}
+
+	// TODO: Index this entry
 }
 
-// TODO: Store and compare os.FileInfo data (file size, etc)
-func (f *files) addOrUnchanged(file string, finfo os.FileInfo) {
+func (f *files) _unchanged(file mailID, info os.FileInfo) {
+	f.f[file] = fileEntry{ found: true, info: info }
+}
+
+func (f *files) addOrUpdate(file mailID, finfo os.FileInfo) {
 	f.l.Lock()
 	defer f.l.Unlock()
 
-	if _, ok := f.f[file]; ok {
-		f._unchanged(file)
+	if entry, ok := f.f[file]; ok {
+		if entry.info.Size() != finfo.Size() ||
+		   entry.info.ModTime() != finfo.ModTime() {
+			f._update(file, finfo)
+		} else {
+			f._unchanged(file, finfo)
+		}
 	} else {
-		f._add(file)
+		f._add(file, finfo)
 	}
 }
 
@@ -55,7 +99,9 @@ func (f *files) markForRemoval() {
 	defer f.l.Unlock()
 
 	for k, _ := range f.f {
-		f.f[k] = fileStatusRem
+		entry := f.f[k]
+		entry.found = false
+		f.f[k] = entry
 	}
 }
 
@@ -63,8 +109,8 @@ func (f *files) sweepRemoved() {
 	f.l.Lock()
 	defer f.l.Unlock()
 
-	for k, s := range f.f {
-		if s == fileStatusRem {
+	for k, entry := range f.f {
+		if !entry.found {
 			delete(f.f, k)
 		}
 	}
@@ -96,7 +142,7 @@ func (m *mailDir) update() {
 
 	filepath.Walk(m.root, func(path string, f os.FileInfo, err error) error {
 		if !f.IsDir() && err == nil {
-			m.files.addOrUnchanged(path, f)
+			m.files.addOrUpdate(mailID(path), f)
 		}
 		return err
 	})
