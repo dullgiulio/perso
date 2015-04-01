@@ -1,8 +1,8 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"flag"
 	"os"
 	"path/filepath"
 	"sync"
@@ -41,12 +41,20 @@ type fileEntry struct {
 type files struct {
 	f map[mailID]fileEntry
 	l *sync.Mutex
+	caches *caches
 }
 
 func newFiles() *files {
+	caches := makeCaches()
+	caches.initCachesString("from")
+	caches.initCachesString("to")
+	caches.initCachesTime("date")
+	go caches.run()
+
 	return &files{
 		f: make(map[mailID]fileEntry),
 		l: &sync.Mutex{},
+		caches: caches,
 	}
 }
 
@@ -67,11 +75,8 @@ func (f *files) _add(file mailID, info os.FileInfo) {
 		log.Print(err)
 	}
 
-	for k, v := range m.msg.Header {
-		fmt.Printf("Header: %s -> %s\n", k, v)
-	}
-
-	// TODO: Index this entry
+	// Index this entry
+	f.caches.index(file, m.msg.Header)
 }
 
 func (f *files) _unchanged(file mailID, info os.FileInfo) {

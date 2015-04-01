@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"time"
 	"sort"
+	"strings"
+	"net/mail"
 )
 
 type cacheString map[string][]mailID
@@ -12,7 +15,7 @@ type caches struct {
 	str map[string]cacheString
 	time map[string]cacheTime
 	cancelCh chan struct{}
-	// messageCh chan *mail.Message
+	mailCh chan cacheMail
 	requestCh chan cacheRequest
 	sweepCh chan []mailID
 }
@@ -26,6 +29,11 @@ type cacheRequest struct {
 	data chan<- []string
 }
 
+type cacheMail struct {
+	id mailID
+	headers mail.Header
+}
+
 func newCacheRequest() *cacheRequest {
 	return &cacheRequest{
 		data: make(chan []string),
@@ -37,6 +45,7 @@ func makeCaches() *caches {
         str: make(map[string]cacheString),
         time: make(map[string]cacheTime),
 	    cancelCh: make(chan struct{}),
+		mailCh: make(chan cacheMail),
 		requestCh: make(chan cacheRequest),
 		sweepCh: make(chan []mailID),
 	}
@@ -48,6 +57,28 @@ func (c *caches) initCachesString(name string) {
 
 func (c *caches) initCachesTime(name string) {
 	c.time[name] = make(map[time.Time][]mailID)
+}
+
+func (m *cacheMail) getHeader(h string) []string {
+	for header, v := range m.headers {
+		header = strings.ToLower(header)
+		if header == h {
+			return v
+		}
+	}
+
+	return nil
+}
+
+func (c *caches) indexMail(m cacheMail) {
+	for name := range c.str {
+		// TODO: Special case for 'to' and 'from': parse addresses
+		if val := m.getHeader(name); val != nil {
+			for _, v := range val {
+				c.addString(name, v, m.id)
+			}
+		}
+	}
 }
 
 func (c *caches) addString(name string, key string, value mailID) {
@@ -147,13 +178,19 @@ func (c *caches) request(r cacheRequest) {
 	c.requestCh <- r
 }
 
+func (c *caches) index(id mailID, headers mail.Header) {
+	c.mailCh <- cacheMail{ id: id, headers: headers }
+}
+
 func (c *caches) run() {
 	for {
 		select {
 		case <-c.cancelCh:
 			return
-		//case <-c.mailCh:
-		//	// Index this mail
+		case m := <-c.mailCh:
+			// Index this mail
+			fmt.Printf("Indexing %s\n", m.id)
+			c.indexMail(m)
 		case <-c.requestCh:
 			// Send back []mailID
 		case mailIDs := <-c.sweepCh:
