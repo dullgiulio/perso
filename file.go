@@ -6,42 +6,42 @@ import (
 	"strings"
 )
 
-type mailID struct {
+type mailFile struct {
 	mailbox string
 	file    string
 }
 
 var errInvalidPath = errors.New("Invalid Path")
 
-func makeMailID(filename string) (mailID, error) {
+func makeMailFile(filename string) (mailFile, error) {
 	parts := strings.Split(filepath.ToSlash(filename), "/")
 
 	if len(parts) < 2 {
-		return mailID{}, errInvalidPath
+		return mailFile{}, errInvalidPath
 	}
 
 	mdPart := parts[len(parts)-2]
 	if mdPart != "cur" && mdPart != "new" {
-		return mailID{}, errInvalidPath
+		return mailFile{}, errInvalidPath
 	}
 
-	return mailID{
+	return mailFile{
 		mailbox: strings.Join(parts[0:len(parts)-2], "/") + "/",
 		file:    strings.Join(parts[len(parts)-2:], "/"),
 	}, nil
 }
 
-func (m mailID) String() string {
+func (m mailFile) String() string {
 	return m.mailbox + m.file
 }
 
-type mailIDSlice []mailID
+type mailFiles []mailFile
 
-func newMailIDSlice() mailIDSlice {
-	return make([]mailID, 0)
+func newMailFiles() mailFiles {
+	return make([]mailFile, 0)
 }
 
-func slicePresent(m mailID, elements mailIDSlice) bool {
+func slicePresent(m mailFile, elements mailFiles) bool {
 	for _, e := range elements {
 		if e == m {
 			return true
@@ -50,8 +50,8 @@ func slicePresent(m mailID, elements mailIDSlice) bool {
 	return false
 }
 
-func sliceDiff(a, b mailIDSlice) mailIDSlice {
-	r := make([]mailID, 0)
+func sliceDiff(a, b mailFiles) mailFiles {
+	r := make([]mailFile, 0)
 
 	for _, e := range a {
 		if !slicePresent(e, b) {
@@ -62,11 +62,11 @@ func sliceDiff(a, b mailIDSlice) mailIDSlice {
 	return r
 }
 
-func (p mailIDSlice) Len() int {
+func (p mailFiles) Len() int {
 	return len(p)
 }
 
-func (p mailIDSlice) Less(i, j int) bool {
+func (p mailFiles) Less(i, j int) bool {
 	if p[i].mailbox == p[j].mailbox {
 		return p[i].file < p[j].file
 	}
@@ -74,6 +74,6 @@ func (p mailIDSlice) Less(i, j int) bool {
 	return p[i].mailbox < p[j].mailbox
 }
 
-func (p mailIDSlice) Swap(i, j int) {
+func (p mailFiles) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }

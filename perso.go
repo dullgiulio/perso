@@ -10,7 +10,7 @@ func findCached(header, value string, cache *caches) {
 	cacheReq := cacheRequest{
 		name: "to",
 		str:  "imps.dev@kuehne-nagel.com",
-		data: make(chan []mailID),
+		data: make(chan []mailFile),
 	}
 
 	cache.requestCh <- cacheReq

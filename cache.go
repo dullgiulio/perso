@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-type cacheString map[string]mailIDSlice
-type cacheTime map[time.Time]mailIDSlice
+type cacheString map[string]mailFiles
+type cacheTime map[time.Time]mailFiles
 
 type cacheFileStatus uint
 
@@ -29,7 +29,7 @@ type cacheFile struct {
 
 type caches struct {
 	root         string
-	files        map[mailID]*cacheFile
+	files        map[mailFile]*cacheFile
 	str          map[string]cacheString
 	time         map[string]cacheTime
 	cancelCh     chan struct{}
@@ -44,24 +44,24 @@ type cacheRequest struct {
 	str      string
 	submatch bool
 	lower    bool
-	data     chan []mailID
+	data     chan []mailFile
 }
 
 type cacheMail struct {
-	id      mailID
+	id      mailFile
 	headers mail.Header
 }
 
 func newCacheRequest() *cacheRequest {
 	return &cacheRequest{
-		data: make(chan []mailID),
+		data: make(chan []mailFile),
 	}
 }
 
 func newCaches(root string) *caches {
 	return &caches{
 		root:         root,
-		files:        make(map[mailID]*cacheFile),
+		files:        make(map[mailFile]*cacheFile),
 		str:          make(map[string]cacheString),
 		time:         make(map[string]cacheTime),
 		cancelCh:     make(chan struct{}),
@@ -71,14 +71,14 @@ func newCaches(root string) *caches {
 }
 
 func (c *caches) initCachesString(name string) {
-	c.str[name] = make(map[string]mailIDSlice)
+	c.str[name] = make(map[string]mailFiles)
 }
 
 func (c *caches) initCachesTime(name string) {
-	c.time[name] = make(map[time.Time]mailIDSlice)
+	c.time[name] = make(map[time.Time]mailFiles)
 }
 
-func (c *caches) indexMail(id mailID, headers ciHeader) {
+func (c *caches) indexMail(id mailFile, headers ciHeader) {
 	for name := range c.str {
 		headerKey, val := headers.get(name)
 		if val == nil {
@@ -115,21 +115,21 @@ func (c *caches) indexMail(id mailID, headers ciHeader) {
 	}
 }
 
-func (c *caches) addString(name string, key string, value mailID) {
+func (c *caches) addString(name string, key string, value mailFile) {
 	if _, found := c.str[name][key]; !found {
-		c.str[name][key] = newMailIDSlice()
+		c.str[name][key] = newMailFiles()
 	}
 
 	c.str[name][key] = append(c.str[name][key], value)
 }
 
-func (c *caches) getString(name string, key string) mailIDSlice {
+func (c *caches) getString(name string, key string) mailFiles {
 	return c.str[name][key]
 }
 
-func (c *caches) addTime(name string, key time.Time, value mailID) {
+func (c *caches) addTime(name string, key time.Time, value mailFile) {
 	if _, found := c.time[name][key]; !found {
-		c.time[name][key] = newMailIDSlice()
+		c.time[name][key] = newMailFiles()
 	}
 
 	c.time[name][key] = append(c.time[name][key], value)
@@ -159,21 +159,21 @@ func (c *caches) getKeysTime(name string) []time.Time {
 	return keys
 }
 
-func (c *caches) sweepCacheStr(name string, removedIDs mailIDSlice) {
+func (c *caches) sweepCacheStr(name string, removedIDs mailFiles) {
 	for k := range c.str[name] {
 		sort.Sort(c.str[name][k])
 		c.str[name][k] = sliceDiff(c.str[name][k], removedIDs)
 	}
 }
 
-func (c *caches) sweepCacheTime(name string, removedIDs mailIDSlice) {
+func (c *caches) sweepCacheTime(name string, removedIDs mailFiles) {
 	for k := range c.str[name] {
 		sort.Sort(c.str[name][k])
 		c.str[name][k] = sliceDiff(c.str[name][k], removedIDs)
 	}
 }
 
-func (c *caches) sweep(removedIDs mailIDSlice) {
+func (c *caches) sweep(removedIDs mailFiles) {
 	for k := range c.str {
 		c.sweepCacheStr(k, removedIDs)
 	}
@@ -183,7 +183,7 @@ func (c *caches) sweep(removedIDs mailIDSlice) {
 	}
 }
 
-func (c *caches) loadMail(id mailID) (*mail.Message, error) {
+func (c *caches) loadMail(id mailFile) (*mail.Message, error) {
 	mailfile := id.String()
 	reader, err := os.Open(mailfile)
 	if err != nil {
@@ -193,12 +193,12 @@ func (c *caches) loadMail(id mailID) (*mail.Message, error) {
 	return mail.ReadMessage(reader)
 }
 
-func (c *caches) updateFile(file mailID, info os.FileInfo) {
+func (c *caches) updateFile(file mailFile, info os.FileInfo) {
 	c.files[file].status = cacheFileStatusUpdated
 	c.files[file].info = info
 }
 
-func (c *caches) addFile(file mailID, info os.FileInfo) {
+func (c *caches) addFile(file mailFile, info os.FileInfo) {
 	c.files[file] = &cacheFile{
 		status: cacheFileStatusAdded,
 		info:   info,
@@ -213,12 +213,12 @@ func (c *caches) addFile(file mailID, info os.FileInfo) {
 	c.indexMail(file, ciHeader(msg.Header))
 }
 
-func (c *caches) unchangedFile(file mailID, info os.FileInfo) {
+func (c *caches) unchangedFile(file mailFile, info os.FileInfo) {
 	c.files[file].status = cacheFileStatusUnchanged
 	c.files[file].info = info
 }
 
-func (c *caches) addOrUpdateFile(file mailID, finfo os.FileInfo) {
+func (c *caches) addOrUpdateFile(file mailFile, finfo os.FileInfo) {
 	if entry, ok := c.files[file]; ok {
 		if entry.info.Size() != finfo.Size() ||
 			entry.info.ModTime() != finfo.ModTime() {
@@ -238,8 +238,8 @@ func (c *caches) markForRemoval() {
 	}
 }
 
-func (c *caches) sweepByStatus(status cacheFileStatus) (mailIDSlice, []os.FileInfo) {
-	removedIDs := newMailIDSlice()
+func (c *caches) sweepByStatus(status cacheFileStatus) (mailFiles, []os.FileInfo) {
+	removedIDs := newMailFiles()
 	removedFinfo := make([]os.FileInfo, 0)
 
 	for key, entry := range c.files {
@@ -261,7 +261,7 @@ func (c *caches) scan() {
 
 	filepath.Walk(c.root, func(path string, f os.FileInfo, err error) error {
 		if !f.IsDir() && err == nil {
-			if file, err := makeMailID(path); err == nil {
+			if file, err := makeMailFile(path); err == nil {
 				c.addOrUpdateFile(file, f)
 			} else {
 				log.Print(err)
@@ -295,11 +295,11 @@ func (c *caches) run(availableCh chan<- bool) {
 		case <-c.cancelCh:
 			return
 		case r := <-c.requestCh:
-			// Send back []mailID
+			// Send back []mailFile
 			if r.str != "" {
 				if cache, found := c.str[r.name]; found {
 					ids := cache[r.str]
-					result := make([]mailID, len(ids))
+					result := make([]mailFile, len(ids))
 					copy(result, ids)
 					r.data <- result
 					continue
