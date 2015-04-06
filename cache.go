@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-type cacheString map[string][]mailID
-type cacheTime map[time.Time][]mailID
+type cacheString map[string]mailIDSlice
+type cacheTime map[time.Time]mailIDSlice
 
 type cacheFileStatus uint
 
@@ -71,11 +71,11 @@ func newCaches(root string) *caches {
 }
 
 func (c *caches) initCachesString(name string) {
-	c.str[name] = make(map[string][]mailID)
+	c.str[name] = make(map[string]mailIDSlice)
 }
 
 func (c *caches) initCachesTime(name string) {
-	c.time[name] = make(map[time.Time][]mailID)
+	c.time[name] = make(map[time.Time]mailIDSlice)
 }
 
 func (c *caches) indexMail(id mailID, headers ciHeader) {
@@ -117,19 +117,19 @@ func (c *caches) indexMail(id mailID, headers ciHeader) {
 
 func (c *caches) addString(name string, key string, value mailID) {
 	if _, found := c.str[name][key]; !found {
-		c.str[name][key] = make([]mailID, 0)
+		c.str[name][key] = newMailIDSlice()
 	}
 
 	c.str[name][key] = append(c.str[name][key], value)
 }
 
-func (c *caches) getString(name string, key string) []mailID {
+func (c *caches) getString(name string, key string) mailIDSlice {
 	return c.str[name][key]
 }
 
 func (c *caches) addTime(name string, key time.Time, value mailID) {
 	if _, found := c.time[name][key]; !found {
-		c.time[name][key] = make([]mailID, 0)
+		c.time[name][key] = newMailIDSlice()
 	}
 
 	c.time[name][key] = append(c.time[name][key], value)
@@ -159,42 +159,21 @@ func (c *caches) getKeysTime(name string) []time.Time {
 	return keys
 }
 
-func slicePresent(m mailID, elements []mailID) bool {
-	for _, e := range elements {
-		if e == m {
-			return true
-		}
-	}
-	return false
-}
-
-func sliceDiff(a, b []mailID) []mailID {
-	r := make([]mailID, 0)
-
-	for _, e := range a {
-		if !slicePresent(e, b) {
-			r = append(r, e)
-		}
-	}
-
-	return r
-}
-
-func (c *caches) sweepCacheStr(name string, removedIDs []mailID) {
+func (c *caches) sweepCacheStr(name string, removedIDs mailIDSlice) {
 	for k := range c.str[name] {
-		sort.Sort(mailIDSlice(c.str[name][k]))
+		sort.Sort(c.str[name][k])
 		c.str[name][k] = sliceDiff(c.str[name][k], removedIDs)
 	}
 }
 
-func (c *caches) sweepCacheTime(name string, removedIDs []mailID) {
+func (c *caches) sweepCacheTime(name string, removedIDs mailIDSlice) {
 	for k := range c.str[name] {
-		sort.Sort(mailIDSlice(c.str[name][k]))
+		sort.Sort(c.str[name][k])
 		c.str[name][k] = sliceDiff(c.str[name][k], removedIDs)
 	}
 }
 
-func (c *caches) sweep(removedIDs []mailID) {
+func (c *caches) sweep(removedIDs mailIDSlice) {
 	for k := range c.str {
 		c.sweepCacheStr(k, removedIDs)
 	}
@@ -205,7 +184,7 @@ func (c *caches) sweep(removedIDs []mailID) {
 }
 
 func (c *caches) loadMail(id mailID) (*mail.Message, error) {
-	mailfile := string(id)
+	mailfile := id.String()
 	reader, err := os.Open(mailfile)
 	if err != nil {
 		return nil, err
@@ -259,8 +238,8 @@ func (c *caches) markForRemoval() {
 	}
 }
 
-func (c *caches) sweepByStatus(status cacheFileStatus) ([]mailID, []os.FileInfo) {
-	removedIDs := make([]mailID, 0)
+func (c *caches) sweepByStatus(status cacheFileStatus) (mailIDSlice, []os.FileInfo) {
+	removedIDs := newMailIDSlice()
 	removedFinfo := make([]os.FileInfo, 0)
 
 	for key, entry := range c.files {
@@ -282,7 +261,11 @@ func (c *caches) scan() {
 
 	filepath.Walk(c.root, func(path string, f os.FileInfo, err error) error {
 		if !f.IsDir() && err == nil {
-			c.addOrUpdateFile(mailID(path), f)
+			if file, err := makeMailID(path); err == nil {
+				c.addOrUpdateFile(file, f)
+			} else {
+				log.Print(err)
+			}
 		}
 		return err
 	})
