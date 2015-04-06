@@ -2,6 +2,9 @@ package main
 
 import (
 	"errors"
+	"io"
+	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -37,10 +40,27 @@ func (m mailFile) String() string {
 	return m.mailbox + m.file
 }
 
+func (m mailFile) WriteTo(w io.Writer) error {
+	r, err := os.Open(m.String())
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(w, r)
+	return err
+}
+
 type mailFiles []mailFile
 
 func newMailFiles() mailFiles {
 	return make([]mailFile, 0)
+}
+
+func (ms mailFiles) WriteTo(w io.Writer) {
+	for _, m := range ms {
+		if err := m.WriteTo(w); err != nil {
+			log.Print("could not write ", m, ": ", err)
+		}
+	}
 }
 
 func slicePresent(m mailFile, elements mailFiles) bool {

@@ -42,7 +42,7 @@ type cacheRequest struct {
 	str      string
 	submatch bool
 	lower    bool
-	data     chan []mailFile
+	data     chan mailFiles
 }
 
 type cacheMail struct {
@@ -52,7 +52,7 @@ type cacheMail struct {
 
 func newCacheRequest() *cacheRequest {
 	return &cacheRequest{
-		data: make(chan []mailFile),
+		data: make(chan mailFiles),
 	}
 }
 
@@ -85,7 +85,7 @@ func (c *caches) indexMail(id mailFile, headers ciHeader) {
 					c.addString(name, strings.ToLower(a.Address), id)
 				}
 			} else {
-				log.Print(err)
+				log.Print(id, ": error parsing header ", headerKey, ": ", err)
 			}
 		default:
 			for _, v := range val {
@@ -126,13 +126,6 @@ func (c *caches) sweepCacheStr(name string, removedIDs mailFiles) {
 	}
 }
 
-func (c *caches) sweepCacheTime(name string, removedIDs mailFiles) {
-	for k := range c.str[name] {
-		sort.Sort(c.str[name][k])
-		c.str[name][k] = sliceDiff(c.str[name][k], removedIDs)
-	}
-}
-
 func (c *caches) sweep(removedIDs mailFiles) {
 	for k := range c.str {
 		c.sweepCacheStr(k, removedIDs)
@@ -162,7 +155,7 @@ func (c *caches) addFile(file mailFile, info os.FileInfo) {
 
 	msg, err := c.loadMail(file)
 	if err != nil {
-		log.Print(err)
+		log.Print(file, ": error parsing ", err)
 	}
 
 	if date, err := msg.Header.Date(); err == nil {
@@ -224,7 +217,7 @@ func (c *caches) scan() {
 			if file, err := makeMailFile(path); err == nil {
 				c.addOrUpdateFile(file, f)
 			} else {
-				log.Print(err)
+				log.Print(path, ": error parsing file ", err)
 			}
 		}
 		return err
@@ -246,31 +239,30 @@ func (c *caches) request(r cacheRequest) {
 	c.requestCh <- r
 }
 
-func (c *caches) run(availableCh chan<- bool) {
+func (c *caches) run() {
 	c.scan()
-	availableCh <- true
 
 	for {
 		select {
 		case <-c.cancelCh:
 			return
 		case r := <-c.requestCh:
-			// Send back []mailFile
-			if r.str != "" {
-				if cache, found := c.str[r.name]; found {
-					ids := cache[r.str]
-					result := make([]mailFile, len(ids))
-					copy(result, ids)
-					r.data <- result
-					continue
-				}
+			if r.str == "" {
+				r.data <- nil
+				continue
+			}
+
+			if cache, found := c.str[r.name]; found {
+				ids := cache[r.str]
+				result := mailFiles(make([]mailFile, len(ids)))
+				copy(result, ids)
+				r.data <- result
+				continue
 			}
 
 			r.data <- nil
 		case <-time.After(c.walkInterval):
-			availableCh <- false
 			c.scan()
-			availableCh <- true
 		}
 	}
 }
