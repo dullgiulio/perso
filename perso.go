@@ -9,7 +9,7 @@ import (
 func findCached(header, value string, cache *caches) {
 	cacheReq := cacheRequest{
 		name: "to",
-		str:  "imps.dev@kuehne-nagel.com",
+		str:  value,
 		data: make(chan []mailFile),
 	}
 
@@ -21,14 +21,15 @@ func findCached(header, value string, cache *caches) {
 
 func main() {
 	flag.Parse()
-	root := flag.Arg(0)
+
+	email := flag.Arg(0)
+	root := flag.Arg(1)
 
 	cacheReadyCh := make(chan bool)
 
 	caches := newCaches(root)
 	caches.initCachesString("from")
 	caches.initCachesString("to")
-	caches.initCachesTime("date")
 	go caches.run(cacheReadyCh)
 
 	// Wait for the cache to warm up.
@@ -47,7 +48,7 @@ func main() {
 	if !ready {
 		log.Print("Cannot use cache now")
 	} else {
-		findCached("to", "dullgiulio@gmail.com", caches)
+		findCached("to", email, caches)
 	}
 
 	caches.cancel()

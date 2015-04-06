@@ -11,7 +11,6 @@ import (
 )
 
 type cacheString map[string]mailFiles
-type cacheTime map[time.Time]mailFiles
 
 type cacheFileStatus uint
 
@@ -31,7 +30,6 @@ type caches struct {
 	root         string
 	files        map[mailFile]*cacheFile
 	str          map[string]cacheString
-	time         map[string]cacheTime
 	cancelCh     chan struct{}
 	mailCh       chan cacheMail
 	requestCh    chan cacheRequest
@@ -63,7 +61,6 @@ func newCaches(root string) *caches {
 		root:         root,
 		files:        make(map[mailFile]*cacheFile),
 		str:          make(map[string]cacheString),
-		time:         make(map[string]cacheTime),
 		cancelCh:     make(chan struct{}),
 		requestCh:    make(chan cacheRequest),
 		walkInterval: time.Second,
@@ -72,10 +69,6 @@ func newCaches(root string) *caches {
 
 func (c *caches) initCachesString(name string) {
 	c.str[name] = make(map[string]mailFiles)
-}
-
-func (c *caches) initCachesTime(name string) {
-	c.time[name] = make(map[time.Time]mailFiles)
 }
 
 func (c *caches) indexMail(id mailFile, headers ciHeader) {
@@ -100,19 +93,6 @@ func (c *caches) indexMail(id mailFile, headers ciHeader) {
 			}
 		}
 	}
-
-	for name := range c.time {
-		// XXX: Only support the "date" header for now.
-		if name != "date" {
-			continue
-		}
-
-		if date, err := headers.Date(); err == nil {
-			c.addTime(name, date, id)
-		} else {
-			log.Print(err)
-		}
-	}
 }
 
 func (c *caches) addString(name string, key string, value mailFile) {
@@ -127,14 +107,6 @@ func (c *caches) getString(name string, key string) mailFiles {
 	return c.str[name][key]
 }
 
-func (c *caches) addTime(name string, key time.Time, value mailFile) {
-	if _, found := c.time[name][key]; !found {
-		c.time[name][key] = newMailFiles()
-	}
-
-	c.time[name][key] = append(c.time[name][key], value)
-}
-
 func (c *caches) getKeysString(name string) []string {
 	keys := make([]string, 0)
 
@@ -143,18 +115,6 @@ func (c *caches) getKeysString(name string) []string {
 	}
 
 	sort.Strings(keys)
-
-	return keys
-}
-
-func (c *caches) getKeysTime(name string) []time.Time {
-	keys := make([]time.Time, 0)
-
-	for k := range c.time[name] {
-		keys = append(keys, k)
-	}
-
-	sort.Sort(timeSlice(keys))
 
 	return keys
 }
@@ -176,10 +136,6 @@ func (c *caches) sweepCacheTime(name string, removedIDs mailFiles) {
 func (c *caches) sweep(removedIDs mailFiles) {
 	for k := range c.str {
 		c.sweepCacheStr(k, removedIDs)
-	}
-
-	for k := range c.time {
-		c.sweepCacheTime(k, removedIDs)
 	}
 }
 
@@ -207,6 +163,10 @@ func (c *caches) addFile(file mailFile, info os.FileInfo) {
 	msg, err := c.loadMail(file)
 	if err != nil {
 		log.Print(err)
+	}
+
+	if date, err := msg.Header.Date(); err == nil {
+		file.date = date
 	}
 
 	// Index this entry

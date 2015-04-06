@@ -4,11 +4,13 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type mailFile struct {
 	mailbox string
 	file    string
+	date    time.Time
 }
 
 var errInvalidPath = errors.New("Invalid Path")
@@ -67,6 +69,10 @@ func (p mailFiles) Len() int {
 }
 
 func (p mailFiles) Less(i, j int) bool {
+	if p[i].date != p[j].date {
+		return p[i].date.Before(p[j].date)
+	}
+
 	if p[i].mailbox == p[j].mailbox {
 		return p[i].file < p[j].file
 	}
