@@ -13,14 +13,23 @@ import (
 type cacheString map[string][]mailID
 type cacheTime map[time.Time][]mailID
 
+type cacheFileStatus uint
+
+const (
+	cacheFileStatusDeleted cacheFileStatus = iota
+	cacheFileStatusAdded
+	cacheFileStatusUpdated
+	cacheFileStatusUnchanged
+)
+
 type cacheFile struct {
-	found bool
-	info  os.FileInfo
+	status cacheFileStatus
+	info   os.FileInfo
 }
 
 type caches struct {
 	root         string
-	files        map[mailID]cacheFile
+	files        map[mailID]*cacheFile
 	str          map[string]cacheString
 	time         map[string]cacheTime
 	cancelCh     chan struct{}
@@ -52,7 +61,7 @@ func newCacheRequest() *cacheRequest {
 func newCaches(root string) *caches {
 	return &caches{
 		root:         root,
-		files:        make(map[mailID]cacheFile),
+		files:        make(map[mailID]*cacheFile),
 		str:          make(map[string]cacheString),
 		time:         make(map[string]cacheTime),
 		cancelCh:     make(chan struct{}),
@@ -196,70 +205,75 @@ func (c *caches) sweep(removedIDs []mailID) {
 }
 
 func (c *caches) loadMail(id mailID) (*mail.Message, error) {
-    mailfile := string(id)
-    reader, err := os.Open(mailfile)
-    if err != nil {
-        return nil, err
-    }
+	mailfile := string(id)
+	reader, err := os.Open(mailfile)
+	if err != nil {
+		return nil, err
+	}
 
-    return mail.ReadMessage(reader)
+	return mail.ReadMessage(reader)
 }
 
 func (c *caches) updateFile(file mailID, info os.FileInfo) {
-    // TODO: Remove this entry from the indices
-
-    c.files[file] = cacheFile{found: true, info: info}
-
-    // TODO: Index again this entry
+	c.files[file].status = cacheFileStatusUpdated
+	c.files[file].info = info
 }
 
 func (c *caches) addFile(file mailID, info os.FileInfo) {
-    c.files[file] = cacheFile{found: true, info: info}
+	c.files[file] = &cacheFile{
+		status: cacheFileStatusAdded,
+		info:   info,
+	}
 
-    msg, err := c.loadMail(file)
-    if err != nil {
-        log.Print(err)
-    }
+	msg, err := c.loadMail(file)
+	if err != nil {
+		log.Print(err)
+	}
 
-    // Index this entry
-    c.indexMail(file, ciHeader(msg.Header))
+	// Index this entry
+	c.indexMail(file, ciHeader(msg.Header))
 }
 
 func (c *caches) unchangedFile(file mailID, info os.FileInfo) {
-    c.files[file] = cacheFile{found: true, info: info}
+	c.files[file].status = cacheFileStatusUnchanged
+	c.files[file].info = info
 }
 
 func (c *caches) addOrUpdateFile(file mailID, finfo os.FileInfo) {
-    if entry, ok := c.files[file]; ok {
-        if entry.info.Size() != finfo.Size() ||
-            entry.info.ModTime() != finfo.ModTime() {
-            c.updateFile(file, finfo)
-        } else {
-            c.unchangedFile(file, finfo)
-        }
-    } else {
+	if entry, ok := c.files[file]; ok {
+		if entry.info.Size() != finfo.Size() ||
+			entry.info.ModTime() != finfo.ModTime() {
+			c.updateFile(file, finfo)
+		} else {
+			c.unchangedFile(file, finfo)
+		}
+	} else {
 		c.addFile(file, finfo)
-    }
+	}
 }
 
 func (c *caches) markForRemoval() {
-    for key, entry := range c.files {
-        entry.found = false
-        c.files[key] = entry
-    }
+	for key, entry := range c.files {
+		entry.status = cacheFileStatusDeleted
+		c.files[key] = entry
+	}
 }
 
-func (c *caches) sweepRemoved() {
-    removed := make([]mailID, 0)
+func (c *caches) sweepByStatus(status cacheFileStatus) ([]mailID, []os.FileInfo) {
+	removedIDs := make([]mailID, 0)
+	removedFinfo := make([]os.FileInfo, 0)
 
-    for key, entry := range c.files {
-        if !entry.found {
-            delete(c.files, key)
-            removed = append(removed, key)
-        }
-    }
+	for key, entry := range c.files {
+		if entry.status == status {
+			delete(c.files, key)
 
-    c.sweep(removed)
+			removedIDs = append(removedIDs, key)
+			removedFinfo = append(removedFinfo, entry.info)
+		}
+	}
+
+	c.sweep(removedIDs)
+	return removedIDs, removedFinfo
 }
 
 func (c *caches) scan() {
@@ -272,6 +286,13 @@ func (c *caches) scan() {
 		}
 		return err
 	})
+
+	c.sweepByStatus(cacheFileStatusDeleted)
+	updatedIDs, updatedFinfo := c.sweepByStatus(cacheFileStatusUpdated)
+
+	for i := 0; i < len(updatedIDs); i++ {
+		c.addFile(updatedIDs[i], updatedFinfo[i])
+	}
 }
 
 func (c *caches) cancel() {
