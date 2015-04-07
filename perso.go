@@ -2,19 +2,18 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 )
 
-func findCached(header, value string, cache *caches) {
-	cacheReq := cacheRequest{
-		header: "to",
-		value:  value,
-		index:  2,
-		limit:  1,
-		data:   make(chan mailFiles),
+func findCached(url string, cache *caches) {
+	cacheReq, err := makeCacheRequest(url)
+	if err != nil {
+		log.Print("Invalid URL ", url, ": ", err)
+		return
 	}
 
-	cache.requestCh <- cacheReq
+	cache.requestCh <- *cacheReq
 	data := <-cacheReq.data
 
 	data.WriteTo(os.Stdout)
@@ -23,7 +22,7 @@ func findCached(header, value string, cache *caches) {
 func main() {
 	flag.Parse()
 
-	email := flag.Arg(0)
+	url := flag.Arg(0)
 	root := flag.Arg(1)
 
 	indexKeys := []string{"", "from", "to"}
@@ -39,7 +38,5 @@ func main() {
 	crawler := newCrawler(indexer, caches, root)
 	crawler.scan()
 
-	findCached("to", email, caches)
-
-	caches.cancel()
+	findCached(url, caches)
 }

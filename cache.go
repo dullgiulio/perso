@@ -9,7 +9,6 @@ type cacheString map[string]mailFiles
 
 type caches struct {
 	data      map[string]cacheString
-	cancelCh  chan struct{}
 	mailCh    chan cacheMail
 	requestCh chan cacheRequest
 	addCh     chan cacheEntry
@@ -45,7 +44,6 @@ func newCacheRequest() *cacheRequest {
 func newCaches(root string) *caches {
 	return &caches{
 		data:      make(map[string]cacheString),
-		cancelCh:  make(chan struct{}),
 		requestCh: make(chan cacheRequest),
 		addCh:     make(chan cacheEntry),
 		removeCh:  make(chan mailFiles),
@@ -75,10 +73,6 @@ func (c *caches) remove(files mailFiles) {
 	}
 }
 
-func (c *caches) cancel() {
-	c.cancelCh <- struct{}{}
-}
-
 func (c *caches) request(r cacheRequest) {
 	c.requestCh <- r
 }
@@ -86,27 +80,33 @@ func (c *caches) request(r cacheRequest) {
 func (c *caches) run() {
 	for {
 		select {
-		case <-c.cancelCh:
-			return
 		case r := <-c.requestCh:
 			if cache, found := c.data[r.header]; found {
-				ids := cache[r.value]
-				if r.limit == 0 {
-					r.limit = len(ids)
+				files := cache[r.value]
+				lfiles := len(files)
+				if lfiles == 0 {
+					r.data <- nil
+					continue
+				}
+
+				if r.limit > lfiles {
+					r.limit = lfiles
+				}
+
+				if r.index >= lfiles {
+					r.index = lfiles - 1
+				}
+
+				if r.oldest {
+					sort.Sort(sort.Reverse(files))
+				} else {
+					sort.Sort(files)
 				}
 
 				// Copy only elements between r.index and r.index + r.limit
 				result := mailFiles(make([]mailFile, r.limit))
 				for i, j := 0, r.index; i < r.limit; i, j = i+1, j+1 {
-					result[i] = ids[j]
-				}
-
-				// Invert result. This assumes the result is ordered by date
-				// TODO: Not sure this is already ordered by date
-				if r.oldest {
-					for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
-						result[i], result[j] = result[j], result[i]
-					}
+					result[i] = files[j]
 				}
 
 				r.data <- result
