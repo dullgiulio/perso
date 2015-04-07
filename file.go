@@ -41,6 +41,10 @@ func (m mailFile) String() string {
 }
 
 func (m mailFile) WriteTo(w io.Writer) error {
+	file := m.String()
+	if file == "" {
+		return nil
+	}
 	r, err := os.Open(m.String())
 	if err != nil {
 		return err

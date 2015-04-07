@@ -38,6 +38,10 @@ func (m *mailIndexer) cacheEntries(file mailFile, msg *mail.Message) []cacheEntr
 		}
 
 		switch key {
+		case "":
+			entries = append(entries, cacheEntry{
+				name: "", key: "", value: file,
+			})
 		case "to", "from":
 			if addresses, err := headers.AddressList(headerKey); err == nil {
 				for _, a := range addresses {

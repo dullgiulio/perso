@@ -7,9 +7,11 @@ import (
 
 func findCached(header, value string, cache *caches) {
 	cacheReq := cacheRequest{
-		name: "to",
-		str:  value,
-		data: make(chan mailFiles),
+		header: "to",
+		value:  value,
+		index:  2,
+		limit:  1,
+		data:   make(chan mailFiles),
 	}
 
 	cache.requestCh <- cacheReq
@@ -24,7 +26,7 @@ func main() {
 	email := flag.Arg(0)
 	root := flag.Arg(1)
 
-	indexKeys := []string{"from", "to"}
+	indexKeys := []string{"", "from", "to"}
 
 	caches := newCaches(root)
 	for i := range indexKeys {
