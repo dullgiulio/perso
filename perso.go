@@ -24,10 +24,18 @@ func main() {
 	email := flag.Arg(0)
 	root := flag.Arg(1)
 
+	indexKeys := []string{"from", "to"}
+
 	caches := newCaches(root)
-	caches.initCachesString("from")
-	caches.initCachesString("to")
+	for i := range indexKeys {
+		caches.initCachesString(indexKeys[i])
+	}
+
 	go caches.run()
+
+	indexer := newMailIndexer(indexKeys)
+	crawler := newCrawler(indexer, caches, root)
+	crawler.scan()
 
 	findCached("to", email, caches)
 
