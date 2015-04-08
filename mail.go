@@ -48,7 +48,7 @@ func newMailIndexer(keys indexKey) *mailIndexer {
 }
 
 func (m *mailIndexer) parse(file mailFile) (*mail.Message, error) {
-	filename := file.String()
+	filename := file.filename()
 	reader, err := os.Open(filename)
 	if err != nil {
 		return nil, err

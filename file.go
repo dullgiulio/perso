@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"errors"
 	"io"
 	"log"
@@ -37,17 +38,26 @@ func makeMailFile(filename string) (mailFile, error) {
 }
 
 func (m mailFile) String() string {
+	return m.file
+}
+
+func (m mailFile) filename() string {
 	return m.mailbox + m.file
 }
 
-func (m mailFile) WriteTo(w io.Writer) error {
-	// TODO: Parse and print correct mbox first line
-	file := m.String()
+func (m mailFile) writeTo(w io.Writer) error {
+	recipient := "MAILER-DAEMON"
+
+	file := m.filename()
 	if file == "" {
 		return nil
 	}
-	r, err := os.Open(m.String())
+	r, err := os.Open(m.filename())
 	if err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(w, "From %s %s\n", recipient, m.date.Format(time.UnixDate)); err != nil {
 		return err
 	}
 	_, err = io.Copy(w, r)
@@ -60,9 +70,9 @@ func newMailFiles() mailFiles {
 	return make([]mailFile, 0)
 }
 
-func (ms mailFiles) WriteTo(w io.Writer) {
+func (ms mailFiles) writeTo(w io.Writer) {
 	for _, m := range ms {
-		if err := m.WriteTo(w); err != nil {
+		if err := m.writeTo(w); err != nil {
 			log.Print("could not write ", m, ": ", err)
 		}
 	}

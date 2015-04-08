@@ -41,5 +41,5 @@ func (h *httpHandler) writeFromURL(url string, w io.Writer) {
 	h.cache.requestCh <- *cacheReq
 	data := <-cacheReq.data
 
-	data.WriteTo(w)
+	data.writeTo(w)
 }
