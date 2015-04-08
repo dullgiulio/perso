@@ -39,7 +39,6 @@ func makeCacheRequest(url string) (*cacheRequest, error) {
 	}
 
 	if len(parts) < 2 {
-		cr.limit = 1
 		return cr, nil
 	}
 
@@ -100,10 +99,10 @@ func makeCacheRequest(url string) (*cacheRequest, error) {
 		return cr, nil
 	}
 
-	if limit, err := strconv.ParseInt(parts[1], 10, 32); err != nil {
+	if index, err := strconv.ParseInt(parts[1], 10, 32); err != nil {
 		return nil, err
 	} else {
-		cr.limit = int(limit)
+		cr.index = int(index)
 		return cr, nil
 	}
 

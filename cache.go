@@ -122,7 +122,10 @@ func (c *caches) run() {
 				continue
 			}
 
-			if r.limit == 0 || r.limit > lfiles {
+			if r.limit == 0 {
+				r.limit = 1
+			}
+			if r.limit > lfiles {
 				r.limit = lfiles
 			}
 

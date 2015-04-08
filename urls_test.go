@@ -5,14 +5,14 @@ import (
 )
 
 func TestUrlLatest(t *testing.T) {
-	cr, err := makeCacheRequest("/latest/1")
+	cr, err := makeCacheRequest("/latest/2")
 	if err != nil {
 		t.Error("No error expected, got: ", err)
 	}
-	if cr.limit != 1 {
+	if cr.limit != 0 {
 		t.Error("Limit is not set correctly")
 	}
-	if cr.index != 0 {
+	if cr.index != 2 {
 		t.Error("Index is not set correctly")
 	}
 	if cr.oldest == true {
@@ -25,10 +25,10 @@ func TestUrlOldest(t *testing.T) {
 	if err != nil {
 		t.Error("No error expected, got: ", err)
 	}
-	if cr.limit != 17 {
+	if cr.limit != 0 {
 		t.Error("Limit is not set correctly")
 	}
-	if cr.index != 0 {
+	if cr.index != 17 {
 		t.Error("Index is not set correctly")
 	}
 	if cr.oldest != true {
@@ -73,10 +73,10 @@ func TestUrlFrom(t *testing.T) {
 	if err != nil {
 		t.Error("No error expected, got: ", err)
 	}
-	if cr.limit != 17 {
+	if cr.limit != 0 {
 		t.Error("Limit is not set correctly")
 	}
-	if cr.index != 0 {
+	if cr.index != 17 {
 		t.Error("Index is not set correctly")
 	}
 	if cr.oldest != true {

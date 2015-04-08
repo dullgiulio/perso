@@ -64,9 +64,6 @@ func (m *mailIndexer) cacheEntries(file mailFile, msg *mail.Message) []cacheEntr
 
 	for key, kt := range m.keys {
 		headerKey, val := headers.get(key)
-		if val == nil {
-			continue
-		}
 
 		switch kt {
 		case keyTypeAny:
@@ -86,6 +83,13 @@ func (m *mailIndexer) cacheEntries(file mailFile, msg *mail.Message) []cacheEntr
 				log.Print(file, ": error parsing header ", headerKey, ": ", err)
 			}
 		default:
+			if val == nil && key == "" {
+				entries = append(entries, cacheEntry{
+					name: "", key: "", value: file,
+				})
+				continue
+			}
+
 			for _, v := range val {
 				entries = append(entries, cacheEntry{
 					name:  key,

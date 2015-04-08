@@ -45,7 +45,7 @@ type config struct {
 
 func newConfig() *config {
 	keys := makeIndexKeys()
-	keys.add("", keyTypeAny)
+	keys.add("", keyTypeNormal)
 	keys.add("from", keyTypeAddr)
 	keys.add("to", keyTypeAddr)
 
