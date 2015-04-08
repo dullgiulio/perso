@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -56,6 +56,7 @@ func (m mailFile) writeTo(w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	defer r.Close()
 
 	if _, err := fmt.Fprintf(w, "From %s %s\n", recipient, m.date.Format(time.UnixDate)); err != nil {
 		return err

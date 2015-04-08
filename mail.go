@@ -53,6 +53,7 @@ func (m *mailIndexer) parse(file mailFile) (*mail.Message, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer reader.Close()
 
 	return mail.ReadMessage(reader)
 }

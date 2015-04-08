@@ -1,6 +1,7 @@
 TODO
 
-* Should show real recipient in "From " line. How to get that? Maybe mailbox name, user setting
 * Better mail parsing library (can accept more non-compliant headers)
+* Should show real recipient in "From " line. How to get that? Maybe mailbox name, user setting
 * Can extract and download attachments and parts of multpart messages
+* Can dump list of indexed values from the cache (ex: all To recipients)
 * Multiple mailboxes (breaks current URLs schema)

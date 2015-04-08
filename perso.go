@@ -22,6 +22,9 @@ func main() {
 
 	crawlInterval := 2 * time.Second
 
+	// Provides help text based on user configuration
+	help := newHelp(indexKeys)
+
 	// Keep track of what is searcheable
 	indexer := newMailIndexer(indexKeys)
 
@@ -42,6 +45,6 @@ func main() {
 	}()
 
 	// Handle all HTTP requests here
-	handler := newHttpHandler(caches, indexer)
+	handler := newHttpHandler(help, caches, indexer)
 	log.Fatal(http.ListenAndServe(":8888", handler))
 }
