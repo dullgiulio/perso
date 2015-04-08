@@ -7,11 +7,41 @@ import (
 	"strings"
 )
 
-type mailIndexer struct {
-	keys []string
+type keyType int
+
+const (
+	keyTypeNormal keyType = iota
+	keyTypeAddr
+	keyTypePart
+	keyTypeAny
+)
+
+type indexKey map[string]keyType
+
+func makeIndexKeys() indexKey {
+	return make(map[string]keyType)
 }
 
-func newMailIndexer(keys []string) *mailIndexer {
+func (i indexKey) add(key string, kt keyType) {
+	key = strings.ToLower(key)
+	i[key] = kt
+}
+
+func (i indexKey) has(key string) bool {
+	_, found := i[key]
+	return found
+}
+
+func (i indexKey) keyType(key string) keyType {
+	k, _ := i[key]
+	return k
+}
+
+type mailIndexer struct {
+	keys indexKey
+}
+
+func newMailIndexer(keys indexKey) *mailIndexer {
 	return &mailIndexer{
 		keys: keys,
 	}
@@ -31,18 +61,18 @@ func (m *mailIndexer) cacheEntries(file mailFile, msg *mail.Message) []cacheEntr
 	entries := make([]cacheEntry, 0)
 	headers := ciHeader(msg.Header)
 
-	for _, key := range m.keys {
+	for key, kt := range m.keys {
 		headerKey, val := headers.get(key)
 		if val == nil {
 			continue
 		}
 
-		switch key {
-		case "":
+		switch kt {
+		case keyTypeAny:
 			entries = append(entries, cacheEntry{
 				name: "", key: "", value: file,
 			})
-		case "to", "from":
+		case keyTypeAddr:
 			if addresses, err := headers.AddressList(headerKey); err == nil {
 				for _, a := range addresses {
 					entries = append(entries, cacheEntry{

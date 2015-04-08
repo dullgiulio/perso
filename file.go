@@ -41,6 +41,7 @@ func (m mailFile) String() string {
 }
 
 func (m mailFile) WriteTo(w io.Writer) error {
+	// TODO: Parse and print correct mbox first line
 	file := m.String()
 	if file == "" {
 		return nil

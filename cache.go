@@ -3,12 +3,14 @@ package main
 import (
 	"net/mail"
 	"sort"
+	"strings"
 )
 
 type cacheString map[string]mailFiles
 
 type caches struct {
 	data      map[string]cacheString
+	indexer   *mailIndexer
 	mailCh    chan cacheMail
 	requestCh chan cacheRequest
 	addCh     chan cacheEntry
@@ -21,6 +23,7 @@ type cacheRequest struct {
 	index  int
 	limit  int
 	oldest bool
+	match  keyType
 	data   chan mailFiles
 }
 
@@ -41,13 +44,19 @@ func newCacheRequest() *cacheRequest {
 	}
 }
 
-func newCaches(root string) *caches {
-	return &caches{
+func newCaches(indexer *mailIndexer, root string) *caches {
+	c := &caches{
+		indexer:   indexer,
 		data:      make(map[string]cacheString),
 		requestCh: make(chan cacheRequest),
 		addCh:     make(chan cacheEntry),
 		removeCh:  make(chan mailFiles),
 	}
+	for i := range indexer.keys {
+		c.initCachesString(i)
+	}
+
+	return c
 }
 
 func (c *caches) initCachesString(name string) {
@@ -73,6 +82,31 @@ func (c *caches) remove(files mailFiles) {
 	}
 }
 
+func (c *caches) match(header, value string, match keyType) mailFiles {
+	cache, found := c.data[header]
+	if !found {
+		return nil
+	}
+
+	// Full match from cache
+	if match != keyTypePart {
+		return cache[value]
+	}
+
+	// Handle partial matches
+	results := newMailFiles()
+
+	for val, files := range cache {
+		if strings.Contains(val, value) {
+			for f := range files {
+				results = append(results, files[f])
+			}
+		}
+	}
+
+	return results
+}
+
 func (c *caches) request(r cacheRequest) {
 	c.requestCh <- r
 }
@@ -81,39 +115,35 @@ func (c *caches) run() {
 	for {
 		select {
 		case r := <-c.requestCh:
-			if cache, found := c.data[r.header]; found {
-				files := cache[r.value]
-				lfiles := len(files)
-				if lfiles == 0 {
-					r.data <- nil
-					continue
-				}
-
-				if r.limit > lfiles {
-					r.limit = lfiles
-				}
-
-				if r.index >= lfiles {
-					r.index = lfiles - 1
-				}
-
-				if r.oldest {
-					sort.Sort(sort.Reverse(files))
-				} else {
-					sort.Sort(files)
-				}
-
-				// Copy only elements between r.index and r.index + r.limit
-				result := mailFiles(make([]mailFile, r.limit))
-				for i, j := 0, r.index; i < r.limit; i, j = i+1, j+1 {
-					result[i] = files[j]
-				}
-
-				r.data <- result
+			files := c.match(r.header, r.value, r.match)
+			lfiles := len(files)
+			if lfiles == 0 {
+				r.data <- nil
 				continue
 			}
 
-			r.data <- nil
+			if r.limit == 0 || r.limit > lfiles {
+				r.limit = lfiles
+			}
+
+			if r.index >= lfiles {
+				r.index = lfiles - 1
+			}
+
+			if !r.oldest {
+				sort.Sort(sort.Reverse(files))
+			} else {
+				sort.Sort(files)
+			}
+
+			// Copy only elements between r.index and r.index + r.limit
+			result := mailFiles(make([]mailFile, r.limit))
+			for i, j := 0, r.index; i < r.limit; i, j = i+1, j+1 {
+				result[i] = files[j]
+			}
+
+			r.data <- result
+			continue
 		case entry := <-c.addCh:
 			c.add(entry)
 		case files := <-c.removeCh:

@@ -6,19 +6,6 @@ import (
 	"strings"
 )
 
-/*
-
-Example URLs:
-
-/latest/1
-/from/dullgiulio@gmail.com
-/from/dullgiulio@gmail.com/latest/1
-/oldest/1
-/from/dullgiulio@gmail.com/oldest
-/from/dullgiulio@gmail.com/oldest/1
-
-*/
-
 var errInvalidURL = errors.New("Invalid URL")
 
 func makeCacheRequest(url string) (*cacheRequest, error) {

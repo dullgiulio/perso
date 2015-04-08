@@ -3,40 +3,45 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
+	"net/http"
+	"time"
 )
-
-func findCached(url string, cache *caches) {
-	cacheReq, err := makeCacheRequest(url)
-	if err != nil {
-		log.Print("Invalid URL ", url, ": ", err)
-		return
-	}
-
-	cache.requestCh <- *cacheReq
-	data := <-cacheReq.data
-
-	data.WriteTo(os.Stdout)
-}
 
 func main() {
 	flag.Parse()
 
-	url := flag.Arg(0)
-	root := flag.Arg(1)
+	root := flag.Arg(0)
 
-	indexKeys := []string{"", "from", "to"}
+	indexKeys := makeIndexKeys()
+	indexKeys.add("", keyTypeAny)
 
-	caches := newCaches(root)
-	for i := range indexKeys {
-		caches.initCachesString(indexKeys[i])
-	}
+	// TODO: Defaults. Should come from args
+	indexKeys.add("from", keyTypeAddr)
+	indexKeys.add("to", keyTypeAddr)
+	indexKeys.add("x-php-originating-script", keyTypePart)
 
+	crawlInterval := 2 * time.Second
+
+	// Keep track of what is searcheable
+	indexer := newMailIndexer(indexKeys)
+
+	// Handle all requests to the cache (searching or adding)
+	caches := newCaches(indexer, root)
 	go caches.run()
 
-	indexer := newMailIndexer(indexKeys)
+	// First crawl. HTTP listener won't start before
 	crawler := newCrawler(indexer, caches, root)
 	crawler.scan()
 
-	findCached(url, caches)
+	// Keep crawling for new or deleted messages
+	go func() {
+		for {
+			<-time.After(crawlInterval)
+			crawler.scan()
+		}
+	}()
+
+	// Handle all HTTP requests here
+	handler := newHttpHandler(caches, indexer)
+	log.Fatal(http.ListenAndServe(":8888", handler))
 }

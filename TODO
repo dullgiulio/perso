@@ -1,0 +1,5 @@
+TODO
+
+* Better mail parsing library (can accept more non-compliant headers)
+* Can extract and download attachments and parts of multpart messages
+* Multiple mailboxes (breaks current URLs schema)

@@ -44,18 +44,23 @@ func (c *crawler) markUpdated(file mailFile, info os.FileInfo) {
 }
 
 func (c *crawler) markAdded(file mailFile, info os.FileInfo) {
-	c.files[file] = &fileMeta{
-		status: fileStatusAdded,
-		info:   info,
-	}
-
 	msg, err := c.indexer.parse(file)
+	if msg == nil || err != nil {
+		log.Print(file, ": error parsing ", err)
+		return
+	}
+	// Non fatal errors
 	if err != nil {
 		log.Print(file, ": error parsing ", err)
 	}
 
 	if date, err := msg.Header.Date(); err == nil {
 		file.date = date
+	}
+
+	c.files[file] = &fileMeta{
+		status: fileStatusAdded,
+		info:   info,
 	}
 
 	// Index this entry
