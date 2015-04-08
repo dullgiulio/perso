@@ -79,6 +79,6 @@ func (h *help) renderHelp(keys indexKey) {
 <body>
 </html>`
 
-		fmt.Fprintf(&b, page, h.renderURLs(keys))
+	fmt.Fprintf(&b, page, h.renderURLs(keys))
 	h.reader = bytes.NewReader(b.Bytes())
 }

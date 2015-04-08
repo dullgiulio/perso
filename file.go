@@ -48,10 +48,6 @@ func (m mailFile) filename() string {
 func (m mailFile) writeTo(w io.Writer) error {
 	recipient := "MAILER-DAEMON"
 
-	file := m.filename()
-	if file == "" {
-		return nil
-	}
 	r, err := os.Open(m.filename())
 	if err != nil {
 		return err
