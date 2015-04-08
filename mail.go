@@ -71,7 +71,7 @@ func (m *mailIndexer) cacheEntries(file mailFile, msg *mail.Message) []cacheEntr
 				name: "", key: "", value: file,
 			})
 		case keyTypeAddr:
-			if addresses, err := headers.AddressList(headerKey); err == nil {
+			if addresses, err := parseAddressesList(strings.Join(val, " ")); err == nil {
 				for _, a := range addresses {
 					entries = append(entries, cacheEntry{
 						name:  key,

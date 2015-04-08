@@ -35,10 +35,14 @@ func (h *help) reverseURLs(keys indexKey) []string {
 		case keyTypePart:
 			url = fmt.Sprintf("/%s/PARTIAL-HEADER-VALUE", k)
 		default:
-			url = fmt.Sprintf("/%s/FULL-HEADER-VALUE", k)
+			if k != "" {
+				url = fmt.Sprintf("/%s/FULL-HEADER-VALUE", k)
+			}
 		}
 
-		urls = append(urls, url)
+		if url != "" {
+			urls = append(urls, url)
+		}
 		urls = append(urls, url+"/latest/N")
 		urls = append(urls, url+"/oldest/N")
 	}
