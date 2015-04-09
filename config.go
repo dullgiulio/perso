@@ -40,7 +40,7 @@ type config struct {
 	keys     indexKey
 	listen   string
 	root     string
-	agent	 string
+	agent    string
 	interval duration
 }
 

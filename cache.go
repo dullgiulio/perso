@@ -111,42 +111,46 @@ func (c *caches) request(r cacheRequest) {
 	c.requestCh <- r
 }
 
+func (c *caches) respond(r cacheRequest) {
+	defer close(r.data)
+
+	files := c.match(r.header, r.value, r.match)
+	lfiles := len(files)
+	if lfiles == 0 {
+		return
+	}
+
+	if r.limit == 0 {
+		r.limit = 1
+	}
+	if r.limit > lfiles {
+		r.limit = lfiles
+	}
+
+	if r.index >= lfiles {
+		r.index = lfiles - 1
+	}
+
+	if !r.oldest {
+		sort.Sort(sort.Reverse(files))
+	} else {
+		sort.Sort(files)
+	}
+
+	// Copy only elements between r.index and r.index + r.limit
+	result := mailFiles(make([]mailFile, r.limit))
+	for i, j := 0, r.index; i < r.limit; i, j = i+1, j+1 {
+		result[i] = files[j]
+	}
+
+	r.data <- result
+}
+
 func (c *caches) run() {
 	for {
 		select {
 		case r := <-c.requestCh:
-			files := c.match(r.header, r.value, r.match)
-			lfiles := len(files)
-			if lfiles == 0 {
-				r.data <- nil
-				continue
-			}
-
-			if r.limit == 0 {
-				r.limit = 1
-			}
-			if r.limit > lfiles {
-				r.limit = lfiles
-			}
-
-			if r.index >= lfiles {
-				r.index = lfiles - 1
-			}
-
-			if !r.oldest {
-				sort.Sort(sort.Reverse(files))
-			} else {
-				sort.Sort(files)
-			}
-
-			// Copy only elements between r.index and r.index + r.limit
-			result := mailFiles(make([]mailFile, r.limit))
-			for i, j := 0, r.index; i < r.limit; i, j = i+1, j+1 {
-				result[i] = files[j]
-			}
-
-			r.data <- result
-			continue
+			c.respond(r)
 		case entry := <-c.addCh:
 			c.add(entry)
 		case files := <-c.removeCh:

@@ -19,12 +19,13 @@ const (
 type fileMeta struct {
 	status fileStatus
 	info   os.FileInfo
+	mfile  mailFile
 }
 
 type crawler struct {
 	cache    *caches
 	root     string
-	files    map[mailFile]*fileMeta
+	files    map[string]*fileMeta
 	interval time.Duration
 	indexer  *mailIndexer
 }
@@ -33,17 +34,18 @@ func newCrawler(indexer *mailIndexer, cache *caches, root string) *crawler {
 	return &crawler{
 		cache:   cache,
 		root:    root,
-		files:   make(map[mailFile]*fileMeta),
+		files:   make(map[string]*fileMeta),
 		indexer: indexer,
 	}
 }
 
-func (c *crawler) markUpdated(file mailFile, info os.FileInfo) {
+func (c *crawler) markUpdated(file string, info os.FileInfo) {
 	c.files[file].status = fileStatusUpdated
 	c.files[file].info = info
 }
 
-func (c *crawler) markAdded(file mailFile, info os.FileInfo) {
+func (c *crawler) markAdded(mfile mailFile, info os.FileInfo) {
+	file := mfile.filename()
 	msg, err := c.indexer.parse(file)
 	if msg == nil || err != nil {
 		log.Print(file, ": error parsing ", err)
@@ -55,22 +57,23 @@ func (c *crawler) markAdded(file mailFile, info os.FileInfo) {
 	}
 
 	if date, err := msg.Header.Date(); err == nil {
-		file.date = date
+		mfile.date = date
 	}
 
 	c.files[file] = &fileMeta{
 		status: fileStatusAdded,
 		info:   info,
+		mfile:	mfile,
 	}
 
 	// Index this entry
-	entries := c.indexer.cacheEntries(file, msg)
+	entries := c.indexer.cacheEntries(mfile, msg)
 	for i := range entries {
 		c.cache.addCh <- entries[i]
 	}
 }
 
-func (c *crawler) markUnchanged(file mailFile) {
+func (c *crawler) markUnchanged(file string) {
 	c.files[file].status = fileStatusUnchanged
 }
 
@@ -81,10 +84,11 @@ func (c *crawler) markAllDeleted() {
 	}
 }
 
-func (c *crawler) markFile(file mailFile, finfo os.FileInfo) {
+func (c *crawler) markFile(mfile mailFile, finfo os.FileInfo) {
+	file := mfile.filename()
 	entry, found := c.files[file]
 	if !found {
-		c.markAdded(file, finfo)
+		c.markAdded(mfile, finfo)
 		return
 	}
 
@@ -101,9 +105,9 @@ func (c *crawler) filesByStatus(status fileStatus) (mailFiles, []os.FileInfo) {
 	files := newMailFiles()
 	infos := make([]os.FileInfo, 0)
 
-	for key, entry := range c.files {
+	for _, entry := range c.files {
 		if entry.status == status {
-			files = append(files, key)
+			files = append(files, entry.mfile)
 			infos = append(infos, entry.info)
 		}
 	}
@@ -113,14 +117,18 @@ func (c *crawler) filesByStatus(status fileStatus) (mailFiles, []os.FileInfo) {
 
 func (c *crawler) remove(files mailFiles) {
 	for _, f := range files {
-		delete(c.files, f)
+		delete(c.files, f.filename())
 	}
 }
 
 func (c *crawler) walk() {
 	filepath.Walk(c.root, func(path string, f os.FileInfo, err error) error {
-		if f.IsDir() || err != nil {
+		if err != nil {
 			return err
+		}
+
+		if f.IsDir() {
+			return nil
 		}
 
 		file, err := makeMailFile(path)

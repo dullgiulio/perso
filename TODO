@@ -1,8 +1,6 @@
 TODO
 
-* Issue a 404 when the index doesn't exist
-* Always redirect to canonical URLs
-* Should show real recipient in "From " line. How to get that? Maybe mailbox name, user setting
+* Maybe output the email in some JSON format?
 * Can extract and download attachments and parts of multpart messages
 * Can dump list of indexed values from the cache (ex: all To recipients)
 * Multiple mailboxes (breaks current URLs schema)
