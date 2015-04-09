@@ -26,19 +26,21 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
-	h.writeFromURL(r.URL.Path, io.Writer(w))
+	if !h.writeFromURL(r.URL.Path, io.Writer(w)) {
+		http.NotFound(w, r)
+	}
 }
 
-func (h *httpHandler) writeFromURL(url string, w io.Writer) {
+func (h *httpHandler) writeFromURL(url string, w io.Writer) bool {
 	cacheReq, err := makeCacheRequest(url)
 	if err != nil {
 		log.Print(url, ": ", err)
-		return
+		return false
 	}
 
 	if !h.indexer.keys.has(cacheReq.header) {
 		log.Print(url, ": ", errInvalidURL)
-		return
+		return false
 	}
 
 	cacheReq.match = h.indexer.keys.keyType(cacheReq.header)
@@ -47,5 +49,10 @@ func (h *httpHandler) writeFromURL(url string, w io.Writer) {
 	h.cache.requestCh <- *cacheReq
 	data := <-cacheReq.data
 
+	if len(data) == 0 {
+		return false
+	}
+
 	data.writeTo(w)
+	return true
 }

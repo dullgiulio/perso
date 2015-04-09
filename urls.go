@@ -64,7 +64,8 @@ func makeCacheRequest(url string) (*cacheRequest, error) {
 			if int(index) < cr.index {
 				return nil, errInvalidURL
 			}
-			cr.limit = int(index) - cr.index
+			// Include last message in range
+			cr.limit = int(index) - cr.index + 1
 			if cr.limit < 0 {
 				return nil, errInvalidURL
 			}

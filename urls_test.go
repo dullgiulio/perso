@@ -41,7 +41,7 @@ func TestUrlLimitRange(t *testing.T) {
 	if err != nil {
 		t.Error("No error expected, got: ", err)
 	}
-	if cr.limit != 3 {
+	if cr.limit != 4 {
 		t.Error("Limit is not set correctly")
 	}
 	if cr.index != 17 {
