@@ -63,7 +63,7 @@ func (c *crawler) markAdded(mfile mailFile, info os.FileInfo) {
 	c.files[file] = &fileMeta{
 		status: fileStatusAdded,
 		info:   info,
-		mfile:	mfile,
+		mfile:  mfile,
 	}
 
 	// Index this entry
