@@ -5,7 +5,8 @@ import (
 )
 
 func TestAddrBraces(t *testing.T) {
-	addr, err := parseNonstandardAddress("<something@something.com> (Name Surname)")
+	h := ciHeader(make(map[string][]string))
+	addr, err := h.parseNonstandardAddress("<something@something.com> (Name Surname)")
 	if err != nil {
 		t.Error("Unexpected error")
 	}
