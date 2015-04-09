@@ -77,7 +77,7 @@ func (c *caches) remove(files mailFiles) {
 	for name := range c.data {
 		for k := range c.data[name] {
 			sort.Sort(c.data[name][k])
-			c.data[name][k] = sliceDiff(c.data[name][k], files)
+			c.data[name][k] = c.data[name][k].diff(files)
 		}
 	}
 }

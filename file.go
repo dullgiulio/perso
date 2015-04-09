@@ -73,8 +73,8 @@ func (ms mailFiles) writeTo(w io.Writer, c *config) {
 	}
 }
 
-func slicePresent(m mailFile, elements mailFiles) bool {
-	for _, e := range elements {
+func (ms mailFiles) contains(m mailFile) bool {
+	for _, e := range ms {
 		if e == m {
 			return true
 		}
@@ -82,11 +82,11 @@ func slicePresent(m mailFile, elements mailFiles) bool {
 	return false
 }
 
-func sliceDiff(a, b mailFiles) mailFiles {
+func (a mailFiles) diff(b mailFiles) mailFiles {
 	r := make([]mailFile, 0)
 
 	for _, e := range a {
-		if !slicePresent(e, b) {
+		if !b.contains(e) {
 			r = append(r, e)
 		}
 	}
