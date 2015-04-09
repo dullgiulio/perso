@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+type errorRedirect string
+
+func (e errorRedirect) Error() string {
+	return string(e)
+}
+
 var errInvalidURL = errors.New("Invalid URL")
 
 func makeCacheRequest(url string) (*cacheRequest, error) {
@@ -21,7 +27,7 @@ func makeCacheRequest(url string) (*cacheRequest, error) {
 	}
 
 	if haveFilter && len(parts) < 2 {
-		return nil, errInvalidURL
+		return nil, errorRedirect("/latest/0")
 	}
 
 	if haveFilter {
@@ -31,15 +37,15 @@ func makeCacheRequest(url string) (*cacheRequest, error) {
 	}
 
 	if len(parts) == 0 {
-		return cr, nil
+		return nil, errorRedirect("/" + url + "/latest/0")
 	}
 
 	if parts[0] == "oldest" {
 		cr.oldest = true
 	}
 
-	if len(parts) < 2 {
-		return cr, nil
+	if len(parts) < 2 || parts[1] == "" {
+		return nil, errorRedirect("/" + url + "/0")
 	}
 
 	if strings.ContainsRune(parts[1], '-') {

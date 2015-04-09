@@ -26,21 +26,25 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
-	if !h.writeFromURL(r.URL.Path, io.Writer(w)) {
-		http.NotFound(w, r)
+	if err := h.writeFromURL(r.URL.Path, io.Writer(w)); err != nil {
+		switch err.(type) {
+		case errorRedirect:
+			http.Redirect(w, r, err.Error(), 307)
+		default:
+			log.Print(r.URL.Path, ": ", err)
+			http.NotFound(w, r)
+		}
 	}
 }
 
-func (h *httpHandler) writeFromURL(url string, w io.Writer) bool {
+func (h *httpHandler) writeFromURL(url string, w io.Writer) error {
 	cacheReq, err := makeCacheRequest(url)
 	if err != nil {
-		log.Print(url, ": ", err)
-		return false
+		return err
 	}
 
 	if !h.indexer.keys.has(cacheReq.header) {
-		log.Print(url, ": ", errInvalidURL)
-		return false
+		return errInvalidURL
 	}
 
 	cacheReq.match = h.indexer.keys.keyType(cacheReq.header)
@@ -50,9 +54,9 @@ func (h *httpHandler) writeFromURL(url string, w io.Writer) bool {
 	data := <-cacheReq.data
 
 	if len(data) == 0 {
-		return false
+		return err
 	}
 
 	data.writeTo(w)
-	return true
+	return nil
 }

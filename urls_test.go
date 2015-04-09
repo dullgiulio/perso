@@ -90,6 +90,33 @@ func TestUrlFrom(t *testing.T) {
 	}
 }
 
+func TestRedirects(t *testing.T) {
+	urls := map[string]string{
+		"/":                                 "/latest/0",
+		"/oldest/":                          "/oldest/0",
+		"/latest/":                          "/latest/0",
+		"/from/dullgiulio@gmail.com/":       "/from/dullgiulio@gmail.com/latest/0",
+		"/from/dullgiulio@gmail.com/latest": "/from/dullgiulio@gmail.com/latest/0",
+		"/from/dullgiulio@gmail.com/oldest": "/from/dullgiulio@gmail.com/oldest/0",
+	}
+
+	for url, expected := range urls {
+		var ok bool
+		_, err := makeCacheRequest(url)
+		if err == nil {
+			t.Error("Expected error, not null")
+			continue
+		}
+		if err, ok = err.(errorRedirect); !ok {
+			t.Error("Expected a redirect error for ", url)
+			continue
+		}
+		if err.Error() != expected {
+			t.Error("Got ", err, " expected ", expected)
+		}
+	}
+}
+
 func TestUrlInvalid(t *testing.T) {
 	urls := []string{
 		"/oldest/ok",
