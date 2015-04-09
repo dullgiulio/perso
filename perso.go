@@ -35,6 +35,6 @@ func main() {
 	}
 
 	// Handle all HTTP requests here
-	handler := newHttpHandler(help, caches, indexer)
+	handler := newHttpHandler(help, caches, conf, indexer)
 	log.Fatal(http.ListenAndServe(conf.listen, handler))
 }

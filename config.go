@@ -40,6 +40,7 @@ type config struct {
 	keys     indexKey
 	listen   string
 	root     string
+	agent	 string
 	interval duration
 }
 
@@ -65,6 +66,7 @@ func (c *config) parseFlags() {
 	flag.Var(&parts, "P", "Header that can be matched by a substring")
 	flag.Var(&c.interval, "i", "Interval between runs of the crawler")
 	flag.StringVar(&c.listen, "s", "0.0.0.0:8888", "Where to listen from (default: 0.0.0.0:8888)")
+	flag.StringVar(&c.agent, "a", "MAILER-DAEMON-PERSO", "What to write after 'From ' in mbox format")
 	flag.Parse()
 
 	for i := range headers {

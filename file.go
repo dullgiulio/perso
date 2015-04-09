@@ -45,16 +45,14 @@ func (m mailFile) filename() string {
 	return m.mailbox + m.file
 }
 
-func (m mailFile) writeTo(w io.Writer) error {
-	recipient := "MAILER-DAEMON"
-
+func (m mailFile) writeTo(w io.Writer, c *config) error {
 	r, err := os.Open(m.filename())
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
-	if _, err := fmt.Fprintf(w, "From %s %s\n", recipient, m.date.Format(time.UnixDate)); err != nil {
+	if _, err := fmt.Fprintf(w, "From %s %s\n", c.agent, m.date.Format(time.UnixDate)); err != nil {
 		return err
 	}
 	_, err = io.Copy(w, r)
@@ -67,9 +65,9 @@ func newMailFiles() mailFiles {
 	return make([]mailFile, 0)
 }
 
-func (ms mailFiles) writeTo(w io.Writer) {
+func (ms mailFiles) writeTo(w io.Writer, c *config) {
 	for _, m := range ms {
-		if err := m.writeTo(w); err != nil {
+		if err := m.writeTo(w, c); err != nil {
 			log.Print("could not write ", m, ": ", err)
 		}
 	}

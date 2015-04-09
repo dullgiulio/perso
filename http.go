@@ -9,13 +9,15 @@ import (
 type httpHandler struct {
 	help    *help
 	cache   *caches
+	config  *config
 	indexer *mailIndexer
 }
 
-func newHttpHandler(help *help, cache *caches, indexer *mailIndexer) *httpHandler {
+func newHttpHandler(help *help, cache *caches, config *config, indexer *mailIndexer) *httpHandler {
 	return &httpHandler{
 		help:    help,
 		cache:   cache,
+		config:  config,
 		indexer: indexer,
 	}
 }
@@ -57,6 +59,6 @@ func (h *httpHandler) writeFromURL(url string, w io.Writer) error {
 		return err
 	}
 
-	data.writeTo(w)
+	data.writeTo(w, h.config)
 	return nil
 }
