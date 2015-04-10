@@ -90,7 +90,7 @@ You can specify multiple headers to index (in addition to 'From' and 'To': they 
 always indexed). For example, you want to make a 'permalink' to your messages:
 
 ```sh
-$ perso -H Message-ID mail-directory/
+$ perso -A Message-ID mail-directory/
 ```
 
 If a header contains addresses, use '-A' instead of '-H'.
@@ -115,7 +115,63 @@ minutes.
 
 ## Example setup with Postfix
 
-TODO
+In this example, we setup Postfix to always send a copy of each outgoing email to
+a local mailbox. Keep in mind that this is a privacy violation (also, illegal in
+many Countries) and should only be done on test machines.
+
+To send everything to a local mailbox, add this to /etc/postfix/main.cf:
+
+```
+always_bcc = my-mailbox@localhost
+```
+
+You probably also want to catch everything and send it to some test account on
+another server (main corporate mail server, for example):
+
+Add this to main.cf:
+
+```
+recipient_canonical_maps = regexp:/etc/postfix/recipient_map.regexp
+sender_canonical_maps = regexp:/etc/postfix/sender_map.regexp
+local_header_rewrite_clients = static:all
+
+virtual_mailbox_domains = test.mailbox
+virtual_mailbox_base = /var/mail
+virtual_mailbox_maps = regexp:/etc/postfix/maildir_map.regexp
+virtual_uid_maps = static:111
+virtual_gid_maps = static:222
+```
+
+Substitute 111 with the UID of the user you want to own the mail. Same goes for
+the 222 as GID.
+
+This will create a mailbox called "test.mailbox" inside /var/mail.
+
+Let's see the contents of the mapping files:
+
+```sh
+$ cat /etc/postfix/maildir_map.regexp
+/.*/    test.mailbox/
+$ cat /etc/postfix/recipient_map.regexp
+/(.*)@localhost/ ${1}@localhost
+/^([^@]*)@(.*)$/!^(my\-name).*^ my-name@mail-server.com
+$ cat /etc/postfix/sender_map.regexp
+/^([^@]*)@(.*)$/!^(my\-name).*^ my-name@mail-server.com
+```
+
+After any changes, remember to restart postfix:
+
+```sh
+# service reload postfix
+```
+
+Then start perso (under a screen/tmux session is best):
+
+```sh
+$ perso -A Message-Id -i 1s /var/mail/test.mailbox/
+```
+
+And voila, it's running. New messages are detected every second.
 
 ## Example setup with Exim
 
