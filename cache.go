@@ -88,6 +88,10 @@ func (c *caches) match(header, value string, match keyType) mailFiles {
 		return nil
 	}
 
+	if match == keyTypeAddr {
+		value = strings.ToLower(value)
+	}
+
 	// Full match from cache
 	if match != keyTypePart {
 		return cache[value]

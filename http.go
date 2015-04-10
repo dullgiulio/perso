@@ -6,6 +6,14 @@ import (
 	"net/http"
 )
 
+type errorNotFound string
+
+func (e errorNotFound) Error() string {
+	return string(e)
+}
+
+var errNotFound = errorNotFound("Not found")
+
 type httpHandler struct {
 	help    *help
 	cache   *caches
@@ -32,6 +40,8 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		switch err.(type) {
 		case errorRedirect:
 			http.Redirect(w, r, err.Error(), 307)
+		case errorNotFound:
+			http.NotFound(w, r)
 		default:
 			log.Print(r.URL.Path, ": ", err)
 			http.NotFound(w, r)
@@ -55,8 +65,8 @@ func (h *httpHandler) writeFromURL(url string, w io.Writer) error {
 	h.cache.requestCh <- *cacheReq
 	data := <-cacheReq.data
 
-	if len(data) == 0 {
-		return err
+	if data == nil || len(data) == 0 {
+		return errNotFound
 	}
 
 	data.writeTo(w, h.config)

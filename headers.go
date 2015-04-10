@@ -24,8 +24,9 @@ func (h ciHeader) AddressList(key string) ([]*mail.Address, error) {
 	header := mail.Header(h)
 
 	// First try with stdlib implementation
-	if addresses, err := header.AddressList(key); err == nil {
-		return addresses, err
+	addresses, err := header.AddressList(key)
+	if err == nil {
+		return addresses, nil
 	}
 
 	value, found := header[key]
