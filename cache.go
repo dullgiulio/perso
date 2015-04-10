@@ -132,7 +132,7 @@ func (c *caches) respond(r cacheRequest) {
 	}
 
 	if r.index >= lfiles {
-		r.index = lfiles - 1
+		return
 	}
 
 	if !r.oldest {
