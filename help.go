@@ -7,7 +7,7 @@ import (
 )
 
 type help struct {
-	reader *bytes.Reader
+	data []byte
 }
 
 func newHelp(keys indexKey) *help {
@@ -17,7 +17,8 @@ func newHelp(keys indexKey) *help {
 }
 
 func (h *help) write(w io.Writer) error {
-	_, err := io.Copy(w, h.reader)
+	r := bytes.NewReader(h.data)
+	_, err := io.Copy(w, r)
 	return err
 }
 
@@ -84,5 +85,5 @@ func (h *help) renderHelp(keys indexKey) {
 </html>`
 
 	fmt.Fprintf(&b, page, h.renderURLs(keys))
-	h.reader = bytes.NewReader(b.Bytes())
+	h.data = b.Bytes()
 }
