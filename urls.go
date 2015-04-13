@@ -14,6 +14,18 @@ func (e errorRedirect) Error() string {
 
 var errInvalidURL = errors.New("Invalid URL")
 
+func makeCacheListRequest(url string) (*cacheListRequest, error) {
+	url = strings.Trim(url, "/")
+
+	if strings.ContainsRune(url, '/') {
+		return nil, errInvalidURL
+	}
+
+	cr := newCacheListRequest()
+	cr.header = url
+	return cr, nil
+}
+
 func makeCacheRequest(url string) (*cacheRequest, error) {
 	cr := newCacheRequest()
 

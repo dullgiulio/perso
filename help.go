@@ -28,6 +28,8 @@ func (h *help) reverseURLs(keys indexKey) []string {
 	for k, t := range keys {
 		var url string
 
+		urls = append(urls, url)
+
 		switch t {
 		case keyTypeAny:
 			continue
@@ -67,13 +69,7 @@ func (h *help) renderURLs(keys indexKey) []byte {
 func (h *help) renderHelp(keys indexKey) {
 	var b bytes.Buffer
 
-	page := `<!DOCTYPE html>
-<html>
-<head>
-	<title>Perso - Help</title>
-</head>
-<body>
-<h1>Perso - Maildir to REST daemon</h1>
+	helpPage := `<h1>Perso - Maildir to REST daemon</h1>
 <ul>
 	<li>Available URLs:
 	%s
@@ -84,6 +80,6 @@ func (h *help) renderHelp(keys indexKey) {
 <body>
 </html>`
 
-	fmt.Fprintf(&b, page, h.renderURLs(keys))
-	h.data = b.Bytes()
+	fmt.Fprintf(&b, helpPage, h.renderURLs(keys))
+	h.data = template("Perso - Help", b.String())
 }

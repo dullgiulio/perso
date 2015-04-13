@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	neturl "net/url"
 )
 
 type errorNotFound string
@@ -19,6 +22,7 @@ type httpHandler struct {
 	cache   *caches
 	config  *config
 	indexer *mailIndexer
+	paths   []string
 }
 
 func newHttpHandler(help *help, cache *caches, config *config, indexer *mailIndexer) *httpHandler {
@@ -27,6 +31,7 @@ func newHttpHandler(help *help, cache *caches, config *config, indexer *mailInde
 		cache:   cache,
 		config:  config,
 		indexer: indexer,
+		paths:   config.keys.all(),
 	}
 }
 
@@ -35,8 +40,18 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.help.write(w)
 		return
 	}
+
+	switch err := h.writeList(r.URL.Path, w); err {
+	case nil:
+		return
+	case errNotFound:
+		log.Print(r.URL.Path, ": ", err)
+		http.NotFound(w, r)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/plain")
-	if err := h.writeFromURL(r.URL.Path, io.Writer(w)); err != nil {
+	if err := h.writeFromURL(r.URL.Path, w); err != nil {
 		switch err.(type) {
 		case errorRedirect:
 			http.Redirect(w, r, err.Error(), 307)
@@ -47,6 +62,38 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 		}
 	}
+}
+
+func (h *httpHandler) writeList(url string, w http.ResponseWriter) error {
+	cr, err := makeCacheListRequest(url)
+	if err != nil {
+		return err
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+
+	if !h.indexer.keys.has(cr.header) {
+		return errInvalidURL
+	}
+
+	h.cache.listCh <- *cr
+	data := <-cr.data
+
+	if data == nil || len(data) == 0 {
+		return errNotFound
+	}
+
+	var b bytes.Buffer
+
+	fmt.Fprintln(&b, "<ul>")
+	for _, val := range data {
+		fmt.Fprintf(&b, `<li><a href="/%s/%s/latest/0">%s</a></li>`, neturl.QueryEscape(cr.header), neturl.QueryEscape(val), val)
+	}
+	fmt.Fprintln(&b, "</ul>")
+
+	w.Write(template(fmt.Sprintf("Perso - List for %s", cr.header), b.String()))
+
+	return nil
 }
 
 func (h *httpHandler) writeFromURL(url string, w io.Writer) error {

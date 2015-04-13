@@ -12,6 +12,7 @@ type caches struct {
 	data      map[string]cacheString
 	indexer   *mailIndexer
 	mailCh    chan cacheMail
+	listCh    chan cacheListRequest
 	requestCh chan cacheRequest
 	addCh     chan cacheEntry
 	removeCh  chan mailFiles
@@ -25,6 +26,11 @@ type cacheRequest struct {
 	oldest bool
 	match  keyType
 	data   chan mailFiles
+}
+
+type cacheListRequest struct {
+	header string
+	data   chan []string
 }
 
 type cacheEntry struct {
@@ -44,10 +50,17 @@ func newCacheRequest() *cacheRequest {
 	}
 }
 
+func newCacheListRequest() *cacheListRequest {
+	return &cacheListRequest{
+		data: make(chan []string),
+	}
+}
+
 func newCaches(indexer *mailIndexer, root string) *caches {
 	c := &caches{
 		indexer:   indexer,
 		data:      make(map[string]cacheString),
+		listCh:    make(chan cacheListRequest),
 		requestCh: make(chan cacheRequest),
 		addCh:     make(chan cacheEntry),
 		removeCh:  make(chan mailFiles),
@@ -150,9 +163,29 @@ func (c *caches) respond(r cacheRequest) {
 	r.data <- result
 }
 
+func (c *caches) list(r cacheListRequest) {
+	defer close(r.data)
+
+	values, found := c.data[r.header]
+	if !found {
+		return
+	}
+
+	keys := make([]string, len(values))
+	i := 0
+	for k := range values {
+		keys[i] = k
+		i = i + 1
+	}
+
+	r.data <- keys
+}
+
 func (c *caches) run() {
 	for {
 		select {
+		case r := <-c.listCh:
+			c.list(r)
 		case r := <-c.requestCh:
 			c.respond(r)
 		case entry := <-c.addCh:

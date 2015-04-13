@@ -8,6 +8,7 @@ func TestUrlLatest(t *testing.T) {
 	cr, err := makeCacheRequest("/latest/2")
 	if err != nil {
 		t.Error("No error expected, got: ", err)
+		return
 	}
 	if cr.limit != 0 {
 		t.Error("Limit is not set correctly")
@@ -24,6 +25,7 @@ func TestUrlOldest(t *testing.T) {
 	cr, err := makeCacheRequest("/oldest/17")
 	if err != nil {
 		t.Error("No error expected, got: ", err)
+		return
 	}
 	if cr.limit != 0 {
 		t.Error("Limit is not set correctly")
@@ -40,6 +42,7 @@ func TestUrlLimitRange(t *testing.T) {
 	cr, err := makeCacheRequest("/oldest/17-20")
 	if err != nil {
 		t.Error("No error expected, got: ", err)
+		return
 	}
 	if cr.limit != 4 {
 		t.Error("Limit is not set correctly")
@@ -56,6 +59,7 @@ func TestUrlLimit(t *testing.T) {
 	cr, err := makeCacheRequest("/oldest/17,3")
 	if err != nil {
 		t.Error("No error expected, got: ", err)
+		return
 	}
 	if cr.limit != 3 {
 		t.Error("Limit is not set correctly")
@@ -65,6 +69,17 @@ func TestUrlLimit(t *testing.T) {
 	}
 	if cr.oldest != true {
 		t.Error("Oldest should be set")
+	}
+}
+
+func TestUrlList(t *testing.T) {
+	cr, err := makeCacheListRequest("/from")
+	if err != nil {
+		t.Error("No error expected, got: ", err)
+		return
+	}
+	if cr.header != "from" {
+		t.Error("Expected 'from', got ", cr.header)
 	}
 }
 

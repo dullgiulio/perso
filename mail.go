@@ -32,6 +32,14 @@ func (i indexKey) has(key string) bool {
 	return found
 }
 
+func (i indexKey) all() []string {
+	keys := make([]string, len(i))
+	for k := range i {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 func (i indexKey) keyType(key string) keyType {
 	k, _ := i[key]
 	return k
