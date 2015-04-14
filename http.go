@@ -1,12 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
-	neturl "net/url"
 )
 
 type errorNotFound string
@@ -36,8 +33,17 @@ func newHttpHandler(help *help, cache *caches, config *config, indexer *mailInde
 }
 
 func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/" {
+		http.Redirect(w, r, "/latest/0", 307)
+		return
+	}
+
 	if r.URL.Path == "/help" {
-		h.help.write(w)
+		tmpl := newTemplate()
+		if err := tmpl.render(w, h.help); err != nil {
+			http.Error(w, err.Error(), 500)
+			log.Print(err)
+		}
 		return
 	}
 
@@ -83,15 +89,14 @@ func (h *httpHandler) writeList(url string, w http.ResponseWriter) error {
 		return errNotFound
 	}
 
-	var b bytes.Buffer
+	tmpl := newTemplate()
+	tmplWriter := newListTemplate(cr.header, data)
 
-	fmt.Fprintln(&b, "<ul>")
-	for _, val := range data {
-		fmt.Fprintf(&b, `<li><a href="/%s/%s/latest/0">%s</a></li>`, neturl.QueryEscape(cr.header), neturl.QueryEscape(val), val)
+	if err := tmpl.render(w, tmplWriter); err != nil {
+		http.Error(w, err.Error(), 500)
+		log.Print(err)
+		return nil
 	}
-	fmt.Fprintln(&b, "</ul>")
-
-	w.Write(template(fmt.Sprintf("Perso - List for %s", cr.header), b.String()))
 
 	return nil
 }
