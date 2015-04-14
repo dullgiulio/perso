@@ -2,5 +2,4 @@ TODO
 
 * Maybe output the email in some JSON format?
 * Can extract and download attachments and parts of multpart messages
-* Can dump list of indexed values from the cache (ex: all To recipients)
 * Multiple mailboxes (breaks current URLs schema)

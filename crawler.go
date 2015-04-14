@@ -47,7 +47,7 @@ func (c *crawler) markUpdated(file string, info os.FileInfo) {
 func (c *crawler) markAdded(mfile mailFile, info os.FileInfo) {
 	file := mfile.filename()
 	msg, err := c.indexer.parse(file)
-	if msg == nil || err != nil {
+	if msg == nil && err != nil {
 		log.Print(file, ": error parsing ", err)
 		return
 	}
