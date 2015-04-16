@@ -25,12 +25,18 @@ func main() {
 	crawler.scan()
 
 	if conf.interval > 0 {
-		// Keep crawling for new or deleted messages
 		go func() {
-			for {
-				<-time.After(time.Duration(conf.interval))
-				crawler.scan()
+			notify, err := newNotify(conf.root)
+			if err != nil {
+				log.Fatal("inotify setup error: ", err)
 			}
+
+			// Keep crawling for new or deleted messages
+			crawler.run(
+				notify.eventsChannel(),
+				notify.errorsChannel(),
+				time.Tick(time.Duration(conf.interval)),
+			)
 		}()
 	}
 

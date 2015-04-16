@@ -77,6 +77,10 @@ func (c *crawler) markUnchanged(file string) {
 	c.files[file].status = fileStatusUnchanged
 }
 
+func (c *crawler) markDeleted(file string) {
+	c.files[file].status = fileStatusDeleted
+}
+
 func (c *crawler) markAllDeleted() {
 	for key, entry := range c.files {
 		entry.status = fileStatusDeleted
@@ -123,12 +127,8 @@ func (c *crawler) remove(files mailFiles) {
 
 func (c *crawler) walk() {
 	filepath.Walk(c.root, func(path string, f os.FileInfo, err error) error {
-		if err != nil {
+		if err != nil || f.IsDir() {
 			return err
-		}
-
-		if f.IsDir() {
-			return nil
 		}
 
 		file, err := makeMailFile(path)
@@ -161,5 +161,18 @@ func (c *crawler) scan() {
 		// XXX: Probably should only mark in markAdded,
 		// then select by status and add in a new function.
 		c.markAdded(filesUp[i], infosUp[i])
+	}
+}
+
+func (c *crawler) run(events <-chan *event, errors <-chan error, tick <-chan time.Time) {
+	for {
+		select {
+		case e := <-events:
+			e.handle(c)
+		case err := <-errors:
+			log.Print(err)
+		case <-tick:
+			c.scan()
+		}
 	}
 }
