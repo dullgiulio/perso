@@ -18,8 +18,8 @@ Download the binary (see downloads below) or build it with Go:
 
 ```sh
 $ go get -u github.com/dullgiulio/perso
-$ cd $GOPATH/github.com/dullgiulio/perso
-$ go build
+$ cd $GOPATH/src/github.com/dullgiulio/perso
+$ go install
 ```
 
 After that, cd to a directory containing e-mail messages (a Maildir,
@@ -28,7 +28,7 @@ can run "perso".
 
 ```sh
 $ cd ~/Mail/ # For example
-$ perso
+$ $GOPATH/bin/perso
 
 ```
 
