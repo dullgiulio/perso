@@ -3,17 +3,14 @@
 package main
 
 import (
-	"golang.org/x/exp/inotify"
+	fsnotify "gopkg.in/fsnotify.v1"
 	"log"
 	"os"
 )
 
-type event struct {
-	e *inotify.Event
-}
+type event fsnotify.Event
 
-func (e *event) handle(c *crawler) {
-	ev := e.e
+func (ev event) handle(c *crawler) {
 	if ev.Name == "" {
 		return
 	}
@@ -29,7 +26,8 @@ func (e *event) handle(c *crawler) {
 		return
 	}
 
-	if ev.Mask&(inotify.IN_DELETE|inotify.IN_MOVE|inotify.IN_MOVED_FROM|inotify.IN_CLOSE_WRITE) != 0 {
+	if ev.Op&fsnotify.Remove == fsnotify.Remove ||
+		ev.Op&fsnotify.Rename == fsnotify.Rename {
 		files := make([]mailFile, 1)
 		files[0] = file
 
@@ -37,38 +35,42 @@ func (e *event) handle(c *crawler) {
 		c.remove(files)
 	}
 
-	if ev.Mask&(inotify.IN_MOVED_TO|inotify.IN_CLOSE_WRITE) != 0 {
+	if ev.Op&fsnotify.Rename == fsnotify.Rename ||
+		ev.Op&fsnotify.Write == fsnotify.Write ||
+		ev.Op&fsnotify.Create == fsnotify.Create {
 		c.markAdded(file, info)
 	}
 }
 
 type notify struct {
 	events  chan *event
-	watcher *inotify.Watcher
+	watcher *fsnotify.Watcher
 }
 
 func newNotify(dir string) (*notify, error) {
-	watcher, err := inotify.NewWatcher()
+	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := watcher.Watch(dir); err != nil {
+	if err := watcher.Add(dir); err != nil {
 		return nil, err
 	}
 
-	ino := &notify{
+	n := &notify{
 		events:  make(chan *event),
 		watcher: watcher,
 	}
 
+	// Listen to events forever, no need to close this watcher.
 	go func() {
-		for e := range watcher.Event {
-			ino.events <- &event{e: e}
+		for ev := range n.watcher.Events {
+			ev := event(ev)
+			n.events <- &ev
 		}
 	}()
 
-	return ino, nil
+	return n, nil
 }
 
 func (i *notify) eventsChannel() chan *event {
@@ -76,5 +78,5 @@ func (i *notify) eventsChannel() chan *event {
 }
 
 func (i *notify) errorsChannel() chan error {
-	return i.watcher.Error
+	return i.watcher.Errors
 }
