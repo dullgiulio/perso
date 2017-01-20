@@ -1,0 +1,19 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "s+jPD0dANCQ66tN5Rmmxc2WT5W0=",
+			"path": "golang.org/x/sys/unix",
+			"revision": "b4e289961544fc90f340c908c3460ceae6a2202a",
+			"revisionTime": "2015-06-12T11:39:23+10:00"
+		},
+		{
+			"checksumSHA1": "eIhF+hmL/XZhzTiAwhLD0M65vlY=",
+			"path": "gopkg.in/fsnotify.v1",
+			"revision": "629574ca2a5df945712d3079857300b5e4da0236",
+			"revisionTime": "2016-10-10T20:33:12-06:00"
+		}
+	],
+	"rootPath": "github.com/dullgiulio/perso"
+}
