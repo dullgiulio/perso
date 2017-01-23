@@ -57,28 +57,24 @@ func (h ciHeader) parseNonstandardAddress(s string) (*mail.Address, error) {
 
 	i := 0
 	for ; i < len(s); i++ {
-		if s[i] == '<' {
-			status = parserStatusAddr
-			break
+		if s[i] == ' ' || s[i] == '\t' {
+			continue
 		}
+		if s[i] == '<' {
+			continue
+		}
+		break
 	}
 
-	if status == parserStatusAddr {
-		status = parserStatusNone
-		begin = i + 1
-		for ; i < len(s); i++ {
-			if s[i] == ' ' || s[i] == '\t' {
-				begin = i
-				continue
-			}
-			if s[i] == '@' {
-				status = parserStatusAddr
-				continue
-			}
-			if s[i] == '>' {
-				end = i
-				break
-			}
+	begin = i
+	for ; i < len(s); i++ {
+		if s[i] == '>' {
+			end = i
+			break
+		}
+		if s[i] == ' ' || s[i] == '\t' {
+			end = i
+			break
 		}
 	}
 
