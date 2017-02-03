@@ -69,6 +69,7 @@ func (c *config) parseFlags() {
 	flag.StringVar(&c.agent, "a", "MAILER-DAEMON-PERSO", "What to write after 'From ' in mbox format")
 	flag.Parse()
 
+	// TODO: All these should be "normalized" and validated!
 	for i := range headers {
 		c.keys.add(headers[i], keyTypeNormal)
 	}

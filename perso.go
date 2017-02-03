@@ -42,5 +42,10 @@ func main() {
 
 	// Handle all HTTP requests here
 	handler := newHttpHandler(help, caches, conf, indexer)
-	log.Fatal(http.ListenAndServe(conf.listen, handler))
+	srv := &http.Server{
+		Addr:         conf.listen,
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+	}
+	log.Fatal(handler.run(srv))
 }
