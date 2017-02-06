@@ -12,8 +12,8 @@ type caches struct {
 	data      map[string]cacheString
 	indexer   *mailIndexer
 	mailCh    chan cacheMail
-	listCh    chan cacheListRequest
-	requestCh chan cacheRequest
+	listCh    chan *cacheListRequest
+	requestCh chan *cacheRequest
 	addCh     chan cacheEntry
 	removeCh  chan mailFiles
 }
@@ -60,8 +60,8 @@ func newCaches(indexer *mailIndexer, root string) *caches {
 	c := &caches{
 		indexer:   indexer,
 		data:      make(map[string]cacheString),
-		listCh:    make(chan cacheListRequest),
-		requestCh: make(chan cacheRequest),
+		listCh:    make(chan *cacheListRequest),
+		requestCh: make(chan *cacheRequest),
 		addCh:     make(chan cacheEntry),
 		removeCh:  make(chan mailFiles),
 	}
@@ -124,11 +124,11 @@ func (c *caches) match(header, value string, match keyType) mailFiles {
 	return results
 }
 
-func (c *caches) request(r cacheRequest) {
+func (c *caches) request(r *cacheRequest) {
 	c.requestCh <- r
 }
 
-func (c *caches) respond(r cacheRequest) {
+func (c *caches) respond(r *cacheRequest) {
 	defer close(r.data)
 
 	files := c.match(r.header, r.value, r.match)
@@ -163,7 +163,7 @@ func (c *caches) respond(r cacheRequest) {
 	r.data <- result
 }
 
-func (c *caches) list(r cacheListRequest) {
+func (c *caches) list(r *cacheListRequest) {
 	defer close(r.data)
 
 	values, found := c.data[r.header]

@@ -105,7 +105,7 @@ func (h *httpHandler) list(k string) func(w http.ResponseWriter, r *http.Request
 		if err != nil {
 			return err
 		}
-		h.cache.listCh <- *cr
+		h.cache.listCh <- cr
 		data := <-cr.data
 		if data == nil || len(data) == 0 {
 			return errNotFound
@@ -137,8 +137,7 @@ func (h *httpHandler) handler(fn func(h *httpHandler, w http.ResponseWriter, r *
 func (h *httpHandler) writeMessages(cr *cacheRequest, w io.Writer) error {
 	cr.match = h.indexer.keys.keyType(cr.header)
 
-	// Copy request object as it will be modified
-	h.cache.requestCh <- *cr
+	h.cache.requestCh <- cr
 	data := <-cr.data
 
 	if data == nil || len(data) == 0 {
