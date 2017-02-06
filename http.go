@@ -21,15 +21,17 @@ type httpHandler struct {
 	helpTmpl *help
 	cache    *caches
 	config   *config
+	crawler  *crawler
 	indexer  *mailIndexer
 	paths    []string
 }
 
-func newHttpHandler(help *help, cache *caches, config *config, indexer *mailIndexer) *httpHandler {
+func newHttpHandler(help *help, cache *caches, config *config, crawler *crawler, indexer *mailIndexer) *httpHandler {
 	return &httpHandler{
 		helpTmpl: help,
 		cache:    cache,
 		config:   config,
+		crawler:  crawler,
 		indexer:  indexer,
 		paths:    config.keys.all(),
 	}
@@ -95,6 +97,9 @@ func (h *httpHandler) messages(key string, oldest bool) func(w http.ResponseWrit
 			return errNotFound // XXX: bad request
 		}
 		w.Header().Set("Content-Type", "text/plain")
+		if r.Method == "DELETE" {
+			return h.deleteMessages(cr)
+		}
 		return h.writeMessages(cr, w)
 	})
 }
@@ -145,5 +150,20 @@ func (h *httpHandler) writeMessages(cr *cacheRequest, w io.Writer) error {
 	}
 
 	data.writeTo(w, h.config)
+	return nil
+}
+
+func (h *httpHandler) deleteMessages(cr *cacheRequest) error {
+	cr.match = h.indexer.keys.keyType(cr.header)
+
+	h.cache.requestCh <- cr
+	msgs := <-cr.data
+
+	if msgs == nil || len(msgs) == 0 {
+		return errNotFound
+	}
+
+	msgs.delete()
+	h.crawler.rescan()
 	return nil
 }

@@ -41,7 +41,7 @@ func main() {
 	}
 
 	// Handle all HTTP requests here
-	handler := newHttpHandler(help, caches, conf, indexer)
+	handler := newHttpHandler(help, caches, conf, crawler, indexer)
 	srv := &http.Server{
 		Addr:         conf.listen,
 		WriteTimeout: 15 * time.Second,

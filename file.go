@@ -73,6 +73,14 @@ func (ms mailFiles) writeTo(w io.Writer, c *config) {
 	}
 }
 
+func (ms mailFiles) delete() {
+	for _, m := range ms {
+		if err := os.Remove(m.filename()); err != nil {
+			log.Print("cannot remove ", m.filename(), ": ", err)
+		}
+	}
+}
+
 func (ms mailFiles) contains(m mailFile) bool {
 	for _, e := range ms {
 		if e == m {

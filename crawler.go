@@ -27,6 +27,7 @@ type crawler struct {
 	root     string
 	files    map[string]*fileMeta
 	interval time.Duration
+	wakeup   chan struct{}
 	indexer  *mailIndexer
 }
 
@@ -35,6 +36,7 @@ func newCrawler(indexer *mailIndexer, cache *caches, root string) *crawler {
 		cache:   cache,
 		root:    root,
 		files:   make(map[string]*fileMeta),
+		wakeup:  make(chan struct{}),
 		indexer: indexer,
 	}
 }
@@ -164,6 +166,10 @@ func (c *crawler) scan() {
 	}
 }
 
+func (c *crawler) rescan() {
+	c.wakeup <- struct{}{}
+}
+
 func (c *crawler) run(events <-chan *event, errors <-chan error, tick <-chan time.Time) {
 	for {
 		select {
@@ -171,6 +177,8 @@ func (c *crawler) run(events <-chan *event, errors <-chan error, tick <-chan tim
 			e.handle(c)
 		case err := <-errors:
 			log.Print(err)
+		case <-c.wakeup:
+			c.scan()
 		case <-tick:
 			c.scan()
 		}
